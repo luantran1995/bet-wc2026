@@ -71,7 +71,11 @@ export class TranslationService {
       'status.tag.won': 'Thắng cược',
       'status.tag.lost': 'Thua cược',
       'selection.home': 'Chủ nhà',
-      'selection.away': 'Khách'
+      'selection.away': 'Khách',
+      'selection.draw': 'Hòa',
+      'auth.error.user_not_found': 'Chưa có tài khoản, hãy đăng ký!',
+      'auth.error.wrong_password': 'Vui lòng xem lại thông tin đăng nhập!',
+      'auth.error.username_exists': 'Tên đăng nhập đã tồn tại!'
     },
     en: {
       'app.title': 'World Cup 2026',
@@ -135,7 +139,11 @@ export class TranslationService {
       'status.tag.won': 'Won',
       'status.tag.lost': 'Lost',
       'selection.home': 'Home team',
-      'selection.away': 'Away team'
+      'selection.away': 'Away team',
+      'selection.draw': 'Draw',
+      'auth.error.user_not_found': 'Account does not exist, please register!',
+      'auth.error.wrong_password': 'Please check your login credentials again!',
+      'auth.error.username_exists': 'Username already exists!'
     }
   };
 

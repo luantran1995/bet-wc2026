@@ -418,9 +418,9 @@ app.post('/api/auth/login', (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'Missing fields' });
   const accounts = readSheet(ACCOUNTS_FILE, 'accounts');
   const user = accounts.find(a => a.username === username);
-  if (!user) return res.status(401).json({ error: 'Sai tên đăng nhập hoặc mật khẩu' });
+  if (!user) return res.status(401).json({ error: 'AUTH_USER_NOT_FOUND' });
   const valid = bcrypt.compareSync(password, user.password);
-  if (!valid) return res.status(401).json({ error: 'Sai tên đăng nhập hoặc mật khẩu' });
+  if (!valid) return res.status(401).json({ error: 'AUTH_WRONG_PASSWORD' });
   res.json({ username: user.username, fullName: user.fullName, role: user.role || 'user' });
 });
 
@@ -429,7 +429,7 @@ app.post('/api/auth/register', (req, res) => {
   if (!username || !password || !fullName) return res.status(400).json({ error: 'Missing fields' });
   const accounts = readSheet(ACCOUNTS_FILE, 'accounts');
   if (accounts.find(a => a.username === username)) {
-    return res.status(400).json({ error: 'Tên đăng nhập đã tồn tại' });
+    return res.status(400).json({ error: 'AUTH_USERNAME_ALREADY_EXISTS' });
   }
   const hashed = bcrypt.hashSync(password, 10);
   const newUser = { id: uuidv4(), username, password: hashed, fullName, role: 'user' };

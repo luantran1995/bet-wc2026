@@ -343,6 +343,7 @@
                         style="background: #04070d; border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; color: var(--text-primary); font-family: var(--font-body); font-size: 0.9rem; outline: none; cursor: pointer; transition: var(--transition);" required>
                     <option value="homeWin">{{ tService.translateText(selectedMatch.homeTeamName) }} {{ tService.currentLang() === 'vi' ? 'Thắng' : 'Win' }}</option>
                     <option value="awayWin">{{ tService.translateText(selectedMatch.awayTeamName) }} {{ tService.currentLang() === 'vi' ? 'Thắng' : 'Win' }}</option>
+                    <option value="draw">{{ tService.currentLang() === 'vi' ? 'Hòa (Draw)' : 'Draw' }}</option>
                 </select>
             </div>
             

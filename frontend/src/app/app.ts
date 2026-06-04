@@ -399,8 +399,11 @@ export class App implements OnInit, OnDestroy {
     if (match) {
       if (bet.betType === 'homeWin') return this.tService.translateText(match.homeTeamName);
       if (bet.betType === 'awayWin') return this.tService.translateText(match.awayTeamName);
+      if (bet.betType === 'draw') return this.tService.t('selection.draw');
     }
-    return bet.betType === 'homeWin' ? this.tService.t('selection.home') : this.tService.t('selection.away');
+    if (bet.betType === 'homeWin') return this.tService.t('selection.home');
+    if (bet.betType === 'awayWin') return this.tService.t('selection.away');
+    return this.tService.t('selection.draw');
   }
 
   getBetPayout(bet: Bet): number {
@@ -523,7 +526,13 @@ export class App implements OnInit, OnDestroy {
         },
         error: (err) => {
           console.error('Registration failed:', err);
-          const errMsg = err.error || (this.tService.currentLang() === 'vi' ? 'Đăng ký không thành công!' : 'Registration failed!');
+          const rawErr = err.error?.error || err.error;
+          let errMsg = '';
+          if (rawErr === 'AUTH_USERNAME_ALREADY_EXISTS') {
+            errMsg = this.tService.t('auth.error.username_exists');
+          } else {
+            errMsg = rawErr || (this.tService.currentLang() === 'vi' ? 'Đăng ký không thành công!' : 'Registration failed!');
+          }
           this.showToast(errMsg, 'danger');
         }
       });
@@ -539,7 +548,15 @@ export class App implements OnInit, OnDestroy {
         },
         error: (err) => {
           console.error('Login failed:', err);
-          const errMsg = err.error || (this.tService.currentLang() === 'vi' ? 'Đăng nhập không thành công!' : 'Login failed!');
+          const rawErr = err.error?.error || err.error;
+          let errMsg = '';
+          if (rawErr === 'AUTH_USER_NOT_FOUND') {
+            errMsg = this.tService.t('auth.error.user_not_found');
+          } else if (rawErr === 'AUTH_WRONG_PASSWORD') {
+            errMsg = this.tService.t('auth.error.wrong_password');
+          } else {
+            errMsg = rawErr || (this.tService.currentLang() === 'vi' ? 'Đăng nhập không thành công!' : 'Login failed!');
+          }
           this.showToast(errMsg, 'danger');
         }
       });
