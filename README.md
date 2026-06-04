@@ -73,9 +73,7 @@ Yêu cầu đã cài đặt **Node.js (v20+)**:
 | Username | Mật Khẩu | Vai Trò (Role) | Họ Tên | Quyền hạn |
 | :--- | :--- | :--- | :--- | :--- |
 | **admin** | `admin123` | Admin | Administrator | Quản lý trận đấu, cập nhật tỉ số, phân định kết quả |
-| **lctran** | `lctran123` | Admin | Lê Công Trân | Quản lý trận đấu, cập nhật tỉ số, phân định kết quả |
-| **cam** | `cam123` | User | Nguyễn Thị Cam | Tham gia đặt cược, xem bảng xếp hạng, lịch sử cược |
-
+| **lctran** | `lctran123` | Admin | Tran Chanh Luan | Quản lý trận đấu, cập nhật tỉ số, phân định kết quả |
 ---
 
 ## 📂 Sơ Đồ Thư Mục
