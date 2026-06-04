@@ -1,70 +1,137 @@
-# Hệ Thống Đặt Cược World Cup 2026 (Angular + Spring Boot + PostgreSQL + Docker)
+# World Cup 2026 Betting System (Angular + Node.js + Excel Database + Docker)
 
-Dự án đã được chuyển đổi thành công từ một trang web tĩnh sang kiến trúc Full-Stack hoàn chỉnh:
-- **Frontend**: Angular 17+ (Vite + esbuild, standalone components)
-- **Backend**: Spring Boot 3 REST API
-- **Database**: PostgreSQL 16
-- **Containerization**: Docker & Docker Compose
+This project is a Full-Stack Monorepo application supporting betting for World Cup 2026 matches. Instead of using traditional relational databases, the system leverages **Excel (.xlsx) files** as a lightweight, visual, and highly portable database.
 
----
+## 🛠️ Tech Stack
 
-## 1. Khởi Chạy Dự Án Bằng Docker (Local)
-
-Để chạy toàn bộ hệ thống (Database, API, và Frontend), bạn chỉ cần chạy một lệnh duy nhất ở thư mục gốc của dự án:
-
-```bash
-docker-compose up --build -d
-```
-
-### Các Cổng Truy Cập:
-- **Frontend Client**: [http://localhost:80](http://localhost:80)
-- **Backend API**: [http://localhost:8080/api](http://localhost:8080/api)
-- **PostgreSQL Database**: `localhost:5432` (User: `postgres`, Password: `postgres`, DB: `wc2026_betting`)
-
-Để dừng và xóa các container:
-```bash
-docker-compose down
-```
+- **Frontend**: [Angular (v21)](./frontend) - Developed using Standalone Components, served via Nginx in Docker environments.
+- **Backend**: [Node.js & Express](./backend-excel) - Serves RESTful APIs, dynamically syncs official match schedules from the FIFA API, and supports automated bet settlement.
+- **Database**: **Excel (.xlsx)** - Stores accounts, matches, and bets in local Excel files located under `backend-excel/data/`.
+- **Containerization**: Docker & Docker Compose for multi-container orchestration.
 
 ---
 
-## 2. Công Cụ Công Khai Ứng Dụng (Public Exposing)
+## 📂 Project Structure
 
-Để mọi người có thể truy cập trang web của bạn từ bất kỳ đâu trên Internet ngay lập tức từ máy tính cá nhân của bạn, bạn có thể sử dụng các công cụ đường hầm (tunneling tools) hoàn toàn miễn phí.
-
-### Cách 1: Sử dụng Localtunnel (Không cần đăng ký tài khoản)
-Chạy lệnh sau trong Command Prompt / PowerShell:
-```bash
-npx localtunnel --port 80
+```text
+bet-wc2026/
+├── backend-excel/               # Backend source code (Node.js + Express)
+│   ├── data/                    # Folder containing Excel Database files (.xlsx)
+│   │   ├── accounts.xlsx        # User and admin accounts
+│   │   ├── matches.xlsx         # Match schedules and results
+│   │   └── bets.xlsx            # Placed bets history
+│   ├── init-data.js             # Seeding script to initialize Excel data from FIFA API
+│   ├── server.js                # Express API entry point & static file server for Frontend
+│   ├── Dockerfile               # Docker build file for backend
+│   └── package.json             # Backend dependencies (express, xlsx, bcryptjs...)
+├── frontend/                    # Frontend source code (Angular 21)
+│   ├── src/                     # Angular app source (Components, Styles, Services)
+│   │   └── app/
+│   │       ├── services/        # Services for API communication and translations
+│   │       ├── app.ts           # Main component logic
+│   │       ├── app.html         # Main Angular UI view
+│   │       └── app.css          # Custom stylesheets
+│   ├── nginx.conf               # Nginx reverse proxy / routing configuration
+│   ├── Dockerfile               # Multi-stage Docker build for Angular static hosting
+│   └── package.json             # Frontend dependencies
+├── docker-compose.yml           # Multi-container startup configuration
+├── package.json                 # Monorepo scripts for installing and building all packages
+└── railway_deployment.md        # Detailed guide for deploying to Railway Cloud
 ```
-Hệ thống sẽ tạo ra một URL công khai dạng: `https://xxxx.localtunnel.me`. Bất kỳ ai cũng có thể truy cập URL này để sử dụng trang web của bạn.
-
-### Cách 2: Sử dụng Ngrok (Bảo mật và ổn định cao)
-1. Tải và cài đặt [Ngrok](https://ngrok.com/).
-2. Đăng ký tài khoản miễn phí và lấy token cấu hình.
-3. Chạy lệnh:
-```bash
-ngrok http 80
-```
-URL công khai dạng `https://xxxx.ngrok-free.app` sẽ được hiển thị trên console.
 
 ---
 
-## 3. Triển Khai Lên Máy Chủ Đám Mây (Cloud Production Hosting)
+## 🚀 Running the Project Locally
 
-Nếu bạn muốn ứng dụng hoạt động 24/7 độc lập mà không cần bật máy tính của mình, bạn có thể triển khai lên các dịch vụ đám mây hỗ trợ Docker.
+Choose one of the two methods below to start the application:
 
-### Tùy chọn A: Railway (Được đề xuất - Tự động nhận diện docker-compose)
-1. Đăng ký tài khoản tại [Railway.app](https://railway.app/).
-2. Tạo một **New Project** -> chọn **Deploy from GitHub repo**.
-3. Railway sẽ tự động nhận diện tệp `docker-compose.yml` và khởi tạo các service (PostgreSQL, Backend, Frontend) tương ứng.
-4. Chọn Service `frontend` -> **Generate Domain** để nhận link công khai truy cập.
+### Option 1: Running with Docker Compose (Recommended)
 
-### Tùy chọn B: Render (Dễ cấu hình và miễn phí)
-1. Đăng ký tài khoản tại [Render.com](https://render.com/).
-2. **Database (PostgreSQL)**: Chọn **New PostgreSQL** -> điền tên cơ sở dữ liệu -> Tạo. Sao chép chuỗi kết nối (Internal Database URL).
-3. **Backend**: Chọn **New Web Service** -> kết nối repository -> chọn môi trường **Docker** -> Cấu hình các Environment Variables:
-   - `DB_HOST`: Host của Render DB vừa tạo.
-   - `DB_PORT`: `5432`
-   - `spring.datasource.url`: Dán URL database của Render.
-4. **Frontend**: Chọn **New Static Site** (hoặc Web Service từ Dockerfile) -> Chọn thư mục `./frontend` -> build từ Dockerfile.
+Make sure you have **Docker** and **Docker Compose** installed on your machine.
+
+1. **Start all services:**
+   ```bash
+   docker-compose up --build -d
+   ```
+2. **Initialize sample data (First-time setup only):**
+   ```bash
+   docker compose exec backend npm run init
+   ```
+
+* **Access Links:**
+  - **Frontend Web**: [http://localhost:80](http://localhost:80)
+  - **Backend API**: [http://localhost:3000/api](http://localhost:3000/api)
+
+---
+
+### Option 2: Running Locally with Node.js & NPM (Development)
+
+Make sure you have **Node.js (v20+)** and **NPM** installed.
+
+1. **Install dependencies and build the static Frontend:**
+   Run this in the root directory:
+   ```bash
+   npm run build
+   ```
+2. **Seed the Excel Database:**
+   Fetch match details from the FIFA API and create default accounts:
+   ```bash
+   npm run init-data
+   ```
+3. **Start the API Server:**
+   ```bash
+   npm run start
+   ```
+
+* **Access Links:**
+  - **Full-Stack Application**: [http://localhost:3000](http://localhost:3000) (Auto-redirects to `/bet-wc/`).
+  - **Backend API**: `http://localhost:3000/api`
+
+---
+
+## 👤 Default Accounts
+
+Once you run the database initialization script, you can log in using the following accounts:
+
+| Username | Password | Role | Full Name |
+| :--- | :--- | :--- | :--- |
+| **admin** | `admin123` | Administrator (Admin) | Administrator |
+| **lctran** | `lctran123` | Administrator (Admin) | Lê Công Trân |
+| **cam** | `cam123` | Standard User (User) | Nguyễn Thị Cam |
+
+*Admin accounts have permissions to update match scores, which triggers automatic bet settlements for all related user bets.*
+
+---
+
+## 🌐 Exposing the App (Public Exposing)
+
+If you want others to access your local environment over the internet, you can use tunneling tools:
+
+* **Localtunnel:**
+  ```bash
+  # If running via Docker (port 80)
+  npx localtunnel --port 80
+  
+  # If running via NPM locally (port 3000)
+  npx localtunnel --port 3000
+  ```
+* **Ngrok:**
+  ```bash
+  ngrok http 80      # Or ngrok http 3000
+  ```
+
+---
+
+## ☁️ Deploying to the Cloud (Railway)
+
+This project is optimized for deployment on the cloud platform **Railway.app**. You have two choices:
+1. **Monolithic Service (Recommended - Cost-efficient):** Runs the entire application in a single container.
+2. **Multi-Service Docker Compose:** Hosts Frontend and Backend containers separately.
+
+> [!IMPORTANT]
+> **Data Persistence Warning:**
+> Since this project uses Excel files as its database stored directly on the container's disk, you **must mount a volume** (Persistent Volume) at `/app/backend-excel/data` (for Option 1) or `/app/data` (for Option 2) to prevent data loss when the container restarts or rebuilds.
+
+For step-by-step cloud instructions, refer to the [Railway Deployment Guide](./railway_deployment.md).
+
+
