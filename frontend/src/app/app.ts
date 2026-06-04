@@ -40,6 +40,10 @@ export class App implements OnInit, OnDestroy {
   currentPage: number = 1;
   pageSize: number = 6;
 
+  // Pagination state for bets
+  betsCurrentPage: number = 1;
+  betsPageSize: number = 4;
+
   // Dropdown list search properties
   selectedGroupFilter: string = '';
   selectedMatchFilter: string = '';
@@ -72,8 +76,6 @@ export class App implements OnInit, OnDestroy {
   toasts: Toast[] = [];
   private toastCounter = 0;
 
-  private pollInterval: any;
-
   // Background rotation state
   backgrounds: string[] = [
     'statue_of_liberty.png',
@@ -103,12 +105,6 @@ export class App implements OnInit, OnDestroy {
     this.loadMatches();
     this.loadBets();
 
-    // Poll for real-time matches and bets from FIFA API / Simulation every 5 seconds
-    this.pollInterval = setInterval(() => {
-      this.loadMatchesSilent();
-      this.loadBetsSilent();
-    }, 5000);
-
     // Background rotation timer (cycles every 8 seconds)
     this.bgInterval = setInterval(() => {
       this.currentBgIndex = (this.currentBgIndex + 1) % this.backgrounds.length;
@@ -117,9 +113,6 @@ export class App implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.pollInterval) {
-      clearInterval(this.pollInterval);
-    }
     if (this.bgInterval) {
       clearInterval(this.bgInterval);
     }
@@ -178,6 +171,7 @@ export class App implements OnInit, OnDestroy {
 
   onSearchChange() {
     this.currentPage = 1;
+    this.betsCurrentPage = 1;
     this.cdr.detectChanges();
   }
 
@@ -201,6 +195,30 @@ export class App implements OnInit, OnDestroy {
   prevMatchPage() {
     if (this.currentPage > 1) {
       this.currentPage--;
+      this.cdr.detectChanges();
+    }
+  }
+
+  // Pagination helpers for Bets
+  get pagedBets(): Bet[] {
+    const startIndex = (this.betsCurrentPage - 1) * this.betsPageSize;
+    return this.filteredBets.slice(startIndex, startIndex + this.betsPageSize);
+  }
+
+  get totalBetPages(): number {
+    return Math.ceil(this.filteredBets.length / this.betsPageSize) || 1;
+  }
+
+  nextBetsPage() {
+    if (this.betsCurrentPage < this.totalBetPages) {
+      this.betsCurrentPage++;
+      this.cdr.detectChanges();
+    }
+  }
+
+  prevBetsPage() {
+    if (this.betsCurrentPage > 1) {
+      this.betsCurrentPage--;
       this.cdr.detectChanges();
     }
   }
@@ -699,6 +717,11 @@ export class App implements OnInit, OnDestroy {
       }
     }
     return true;
+  }
+
+  hasUserBetOnMatch(matchId: string): boolean {
+    if (!this.currentUser) return false;
+    return this.bets.some(b => b.matchId?.toString() === matchId.toString() && (b.username === this.currentUser.username || b.name === this.currentUser.fullName));
   }
 
   getMatchForBet(bet: Bet): Match | null {
