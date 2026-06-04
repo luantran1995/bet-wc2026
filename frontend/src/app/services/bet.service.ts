@@ -90,4 +90,8 @@ export class BetService {
   register(userData: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/auth/register`, userData);
   }
+
+  getExportUrl(): string {
+    return `${this.apiUrl}/bets/export`;
+  }
 }

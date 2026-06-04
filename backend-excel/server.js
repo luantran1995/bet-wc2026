@@ -353,6 +353,18 @@ app.get('/api/bets', (req, res) => {
   res.json(bets);
 });
 
+app.get('/api/bets/export', (req, res) => {
+  if (!fs.existsSync(BETS_FILE)) {
+    return res.status(404).send('Bets file does not exist');
+  }
+  res.download(BETS_FILE, 'bets.xlsx', (err) => {
+    if (err) {
+      console.error('[Export Error]', err);
+      res.status(500).send('Error downloading file');
+    }
+  });
+});
+
 app.post('/api/bets', (req, res) => {
   const bets = readSheet(BETS_FILE, 'bets');
   const newBet = {

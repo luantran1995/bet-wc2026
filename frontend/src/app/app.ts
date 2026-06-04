@@ -394,6 +394,10 @@ export class App implements OnInit, OnDestroy {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
   }
 
+  exportBetsToExcel() {
+    window.location.href = this.betService.getExportUrl();
+  }
+
   getBetDisplaySelection(bet: Bet): string {
     const match = this.matches.find(m => m.id?.toString() === bet.matchId?.toString());
     if (match) {
