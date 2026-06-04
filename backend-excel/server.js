@@ -407,8 +407,22 @@ app.get('/api/bets/export', (req, res) => {
 
 app.post('/api/bets', (req, res) => {
   const bets = readSheet(BETS_FILE, 'bets');
+  const matchIdStr = req.body.matchId?.toString();
+  const username = req.body.username || '';
+  const fullName = req.body.name || '';
+
+  // Check if this user has already placed a bet on this match
+  const existingBet = bets.find(b => 
+    b.matchId?.toString() === matchIdStr && 
+    ((username && b.username === username) || (fullName && b.name === fullName))
+  );
+
+  if (existingBet) {
+    return res.status(409).json({ error: 'Bạn đã đặt cược cho trận đấu này rồi! Mỗi người chơi chỉ được cược tối đa 1 lần cho mỗi trận.' });
+  }
+
   const matches = readSheet(MATCHES_FILE, 'matches');
-  const match = matches.find(m => m.id?.toString() === req.body.matchId?.toString());
+  const match = matches.find(m => m.id?.toString() === matchIdStr);
   
   let resolvedBetType = req.body.betType || 'homeWin';
   if (match) {
@@ -428,8 +442,8 @@ app.post('/api/bets', (req, res) => {
   const newBet = {
     id:        uuidv4(),
     date:      new Date().toISOString(),
-    name:      req.body.name      || '',
-    username:  req.body.username  || '',
+    name:      fullName,
+    username:  username,
     matchId:   req.body.matchId   || '',
     matchName: req.body.matchName || '',
     betType:   resolvedBetType,
