@@ -1,0 +1,520 @@
+<div class="dynamic-background" [style.background-image]="'radial-gradient(circle, rgba(7, 10, 19, 0.76) 0%, rgba(7, 10, 19, 0.94) 100%), url(' + backgrounds[currentBgIndex] + ')'"></div>
+
+<div *ngIf="currentUser; else guestAuthLayout">
+<!-- TOP HEADER -->
+<header class="main-header">
+    <div class="header-content">
+        <div class="logo-wrap" (click)="setSection('matches-section')" style="cursor: pointer;">
+            <i class="fa-solid fa-trophy trophy-icon"></i>
+            <div class="logo-text">
+                {{ tService.t('app.title') }}
+                <span>{{ tService.t('app.subtitle') }}</span>
+            </div>
+        </div>
+        <div class="header-nav" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <a href="#" (click)="setSection('matches-section'); $event.preventDefault()" 
+               [class.active]="activeSection === 'matches-section'" class="nav-link">
+                <i class="fa-solid fa-gamepad"></i> {{ tService.t('nav.matches') }}
+            </a>
+            <a href="#" (click)="setSection('admin-section'); $event.preventDefault()" 
+               [class.active]="activeSection === 'admin-section'" class="nav-link">
+                <i class="fa-solid fa-user-shield"></i> {{ tService.t('nav.bets') }}
+                <span class="nav-badge" *ngIf="pendingCount > 0" 
+                      style="background: var(--danger); color: white; padding: 0.1rem 0.4rem; border-radius: 10px; font-size: 0.7rem; margin-left: 0.3rem; font-weight: 700; box-shadow: 0 0 5px rgba(239, 68, 68, 0.4);">
+                    {{ pendingCount }}
+                </span>
+            </a>
+            <!-- Profile / Auth area -->
+            <ng-container *ngIf="currentUser; else anonymousUser">
+                <div class="nav-link" style="color: var(--accent-gold); font-weight: bold; font-size: 0.85rem; background: rgba(245, 176, 65, 0.05); border: 1px solid rgba(245, 176, 65, 0.15); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.4rem;">
+                    <i class="fa-solid fa-circle-user" style="font-size: 1.1rem;"></i>
+                    <span>{{ currentUser.fullName }}</span>
+                </div>
+                <button (click)="handleLogout()" class="nav-link" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15); color: #ef4444; font-weight: bold; cursor: pointer; padding: 0.4rem 0.8rem; border-radius: var(--radius-sm); transition: var(--transition);">
+                    <i class="fa-solid fa-right-from-bracket"></i> {{ tService.currentLang() === 'vi' ? 'Thoát' : 'Logout' }}
+                </button>
+            </ng-container>
+            <ng-template #anonymousUser>
+                <button (click)="openAuthModal()" class="nav-link" style="background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: var(--text-primary); font-weight: bold; cursor: pointer; padding: 0.4rem 0.8rem; border-radius: var(--radius-sm); transition: var(--transition);">
+                    <i class="fa-solid fa-key"></i> {{ tService.currentLang() === 'vi' ? 'Đăng Nhập' : 'Login' }}
+                </button>
+            </ng-template>
+            <!-- Language switcher button -->
+            <button (click)="tService.toggleLanguage()" class="nav-link" style="background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: var(--accent-gold); font-weight: bold; cursor: pointer; padding: 0.4rem 0.8rem; border-radius: var(--radius-sm);">
+                <i class="fa-solid fa-globe"></i> {{ tService.currentLang() === 'vi' ? 'EN' : 'VI' }}
+            </button>
+        </div>
+    </div>
+</header>
+
+<div class="container">
+    <div class="app-layout">
+        <!-- Left Sidebar Area -->
+        <aside class="app-sidebar left-sidebar">
+            <div class="sidebar-widget host-showcase">
+                <h3 class="widget-title">
+                    <i class="fa-solid fa-map-location-dot" style="color: var(--accent-gold); margin-right: 0.25rem;"></i>
+                    {{ tService.currentLang() === 'vi' ? 'ĐỊA ĐIỂM THI ĐẤU' : 'HOST VENUES' }}
+                </h3>
+                <div class="player-image-wrap">
+                    <img src="stadium_bg.png" alt="World Cup 2026 Stadiums" class="sidebar-player-img">
+                </div>
+                <div class="widget-footer">
+                    <p>{{ tService.currentLang() === 'vi' ? 'Trận đấu sẽ diễn ra tại 16 thành phố hiện đại thuộc 3 quốc gia đồng chủ nhà: Mỹ, Canada và Mexico.' : 'Matches will be played across 16 modern host cities in USA, Canada, and Mexico.' }}</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+    
+    <!-- SECTION 1: MATCHES LIST -->
+    <section id="matches-section" class="app-section" [class.active]="activeSection === 'matches-section'">
+
+
+        <!-- Dropdown Filter Panel -->
+        <div class="matches-controls-panel" style="background: rgba(11, 17, 33, 0.4); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 0.75rem 1rem; margin-bottom: 1rem; backdrop-filter: blur(10px);">
+            <!-- Two Dropdown Lists for filtering (Trận đấu and Bảng đấu) -->
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; width: 100%;">
+                <!-- 1. Trận đấu (Match select) -->
+                <div class="filter-select-wrap" style="flex: 2; min-width: 200px;">
+                    <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 600;">
+                        <i class="fa-solid fa-gamepad" style="color: var(--accent-gold); margin-right: 0.25rem;"></i> 
+                        {{ tService.currentLang() === 'vi' ? 'Trận đấu' : 'Match' }}
+                    </label>
+                    <select [(ngModel)]="selectedMatchFilter" (ngModelChange)="onSearchChange()" style="border-radius: var(--radius-sm); border-color: var(--card-border); background: #04070d; padding: 0.45rem 0.75rem; width: 100%; color: var(--text-secondary); cursor: pointer; outline: none; font-size: 0.8rem;">
+                        <option value="">{{ tService.t('matches.filter.all') }}</option>
+                        <option *ngFor="let m of availableMatches" [value]="m.id">
+                            {{ tService.translateText(m.homeTeamName) }} vs {{ tService.translateText(m.awayTeamName) }}
+                        </option>
+                    </select>
+                </div>
+
+                <!-- 2. Bảng đấu (Group select) -->
+                <div class="filter-select-wrap" style="flex: 1; min-width: 200px;">
+                    <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 600;">
+                        <i class="fa-solid fa-circle-nodes" style="color: var(--accent-gold); margin-right: 0.25rem;"></i>
+                        {{ tService.t('matches.search.criteria.group') }}
+                    </label>
+                    <select [(ngModel)]="selectedGroupFilter" (ngModelChange)="onSearchChange()" style="border-radius: var(--radius-sm); border-color: var(--card-border); background: #04070d; padding: 0.45rem 0.75rem; width: 100%; color: var(--text-secondary); cursor: pointer; outline: none; font-size: 0.8rem;">
+                        <option value="">{{ tService.t('matches.filter.all') }}</option>
+                        <option *ngFor="let group of availableGroups" [value]="group">
+                            {{ getGroupDisplayName(group) }}
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Clear Filter Button -->
+                <button *ngIf="isAnyFilterActive" (click)="clearAllFilters()" class="row-action-btn btn-delete" style="width: auto; padding: 0.6rem 1.2rem; border-radius: var(--radius-sm); font-size: 0.8rem; font-family: var(--font-heading); font-weight: 700; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; height: 38px; margin-bottom: 2px; transition: var(--transition);">
+                    <i class="fa-solid fa-filter-circle-xmark"></i> {{ tService.t('matches.filter.clear') }}
+                </button>
+
+                <!-- Sync FIFA API Button -->
+                <button (click)="syncMatches()" class="row-action-btn" [disabled]="isSyncing" style="width: auto; padding: 0.6rem 1.2rem; border-radius: var(--radius-sm); font-size: 0.8rem; font-family: var(--font-heading); font-weight: 700; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; height: 38px; margin-bottom: 2px; transition: var(--transition); border: 1px solid rgba(46, 204, 113, 0.3); background: rgba(46, 204, 113, 0.15); color: #2ecc71;">
+                    <i class="fa-solid fa-arrows-rotate" [class.fa-spin]="isSyncing"></i> 
+                    {{ tService.currentLang() === 'vi' ? 'Cập nhật tỉ số' : 'Sync Live Scores' }}
+                </button>
+            </div>
+        </div>
+        
+        <div class="matches-grid">
+            <div *ngIf="filteredMatches.length === 0" class="empty-betslip" style="grid-column: 1/-1;">
+                <i class="fa-solid fa-calendar-minus"></i>
+                <p>{{ tService.t('matches.empty') }}</p>
+            </div>
+            
+            <div *ngFor="let match of pagedMatches" class="match-card">
+                <!-- Match meta row -->
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <span style="background: rgba(245,176,65,0.08); color: var(--accent-gold); padding: 0.15rem 0.5rem; border-radius: 4px; text-transform: uppercase; font-size: 0.6rem; border: 1px solid rgba(245,176,65,0.15);">{{ tService.translateText(match.round) }}</span>
+                    <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span style="color: var(--text-muted); display: flex; align-items: center; gap: 0.2rem;"><i class="fa-regular fa-clock"></i> {{ tService.translateText(match.time) }} {{ tService.currentLang() === 'vi' ? '(Giờ VN)' : '(ICT)' }}</span>
+                        <span class="live-badge-glow" *ngIf="match.status === 'live'" style="font-size: 0.6rem;"><span class="pulse-dot"></span> {{ tService.t('matches.live') }}</span>
+                        <span class="completed-badge" *ngIf="match.status === 'completed'" style="font-size: 0.6rem;">{{ tService.t('matches.ft') }}</span>
+                    </div>
+                </div>
+
+                <!-- Teams horizontal row -->
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0;">
+                    <!-- Home team -->
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
+                        <div class="team-flag-wrap" style="overflow: hidden; flex-shrink: 0;">
+                            <img [src]="getFlagUrl(match.homeTeamFlag)" [alt]="match.homeTeamName" style="width: 100%; height: 100%; object-fit: cover;">
+                        </div>
+                        <span class="team-name" style="text-align: left;">{{ tService.translateText(match.homeTeamName) }}</span>
+                    </div>
+
+                    <!-- Score / VS center -->
+                    <div style="flex-shrink: 0; text-align: center; min-width: 40px;">
+                        <span class="live-score-display" *ngIf="match.status === 'live' || match.status === 'completed'" style="font-size: 0.9rem;">{{ match.homeTeamGoals }} - {{ match.awayTeamGoals }}</span>
+                        <span class="vs-divider" *ngIf="match.status === 'scheduled'" style="font-size: 0.7rem;">VS</span>
+                    </div>
+
+                    <!-- Away team -->
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; flex-direction: row-reverse;">
+                        <div class="team-flag-wrap" style="overflow: hidden; flex-shrink: 0;">
+                            <img [src]="getFlagUrl(match.awayTeamFlag)" [alt]="match.awayTeamName" style="width: 100%; height: 100%; object-fit: cover;">
+                        </div>
+                        <span class="team-name" style="text-align: right;">{{ tService.translateText(match.awayTeamName) }}</span>
+                    </div>
+                </div>
+
+                <!-- Action button -->
+                <button *ngIf="match.status === 'scheduled'" class="submit-bet-btn" (click)="openBettingModal(match.id.toString())" style="width: 100%; border-radius: var(--radius-sm); padding: 0.45rem 0; font-size: 0.72rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                    <i class="fa-solid fa-pen-to-square"></i> {{ tService.t('matches.btn.bet') }}
+                </button>
+                <button *ngIf="match.status === 'live'" class="submit-bet-btn locked" disabled style="width: 100%; border-radius: var(--radius-sm); padding: 0.45rem 0; font-size: 0.72rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                    <i class="fa-solid fa-lock"></i> {{ tService.t('matches.btn.locked') }}
+                </button>
+                <button *ngIf="match.status === 'completed'" class="submit-bet-btn locked" disabled style="width: 100%; border-radius: var(--radius-sm); padding: 0.45rem 0; font-size: 0.72rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                    <i class="fa-solid fa-circle-check"></i> {{ tService.t('matches.btn.finished') }}
+                </button>
+            </div>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="pagination-bar" *ngIf="filteredMatches.length > pageSize" style="display: flex; justify-content: center; align-items: center; gap: 0.5rem; margin-top: 0.5rem; background: rgba(11, 17, 33, 0.4); padding: 0.4rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--card-border); backdrop-filter: blur(10px); width: fit-content; margin-left: auto; margin-right: auto;">
+            <!-- Prev Button -->
+            <button (click)="prevMatchPage()" [disabled]="currentPage === 1" class="page-btn" style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); color: var(--text-primary); width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition);">
+                <i class="fa-solid fa-angle-left"></i>
+            </button>
+            
+            <!-- Page Info -->
+            <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; margin: 0 0.5rem;">
+                {{ tService.currentLang() === 'vi' ? 'Trang' : 'Page' }} {{ currentPage }} / {{ totalMatchPages }}
+            </span>
+            
+            <!-- Next Button -->
+            <button (click)="nextMatchPage()" [disabled]="currentPage === totalMatchPages" class="page-btn" style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); color: var(--text-primary); width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition);">
+                <i class="fa-solid fa-angle-right"></i>
+            </button>
+        </div>
+    </section>
+    
+    <!-- SECTION 2: ADMIN - BET REGISTRY LIST -->
+    <section id="admin-section" class="app-section" [class.active]="activeSection === 'admin-section'">
+        <div class="section-header" style="flex-direction: column; align-items: flex-start; gap: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 1rem;">
+                <h2 class="section-title"><i class="fa-solid fa-database"></i> {{ tService.t('admin.title') }}</h2>
+                <div style="display: flex; gap: 1rem; font-size: 0.85rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 0.5rem 1rem; border-radius: var(--radius-sm);">
+                    <span style="color: var(--text-secondary);">{{ tService.t('admin.pending') }} <strong style="color: var(--accent-gold);">{{ pendingCount }}</strong></span>
+                    <span style="color: var(--text-secondary);">{{ tService.t('admin.winrate') }} <strong style="color: var(--success);">{{ winRate }}</strong></span>
+                </div>
+            </div>
+            
+            <!-- Search & Filters -->
+            <div class="admin-controls" style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 1rem; flex-wrap: wrap;">
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; flex: 1;">
+                    <div class="search-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" [(ngModel)]="searchQuery" (ngModelChange)="onSearchChange()" placeholder="{{ tService.t('admin.search') }}">
+                    </div>
+                    <div class="filter-select-wrap">
+                        <select [(ngModel)]="statusFilter" (ngModelChange)="onSearchChange()">
+                            <option value="all">{{ tService.t('admin.filter.status.all') }}</option>
+                            <option value="pending">{{ tService.t('admin.filter.status.pending') }}</option>
+                            <option value="won">{{ tService.t('admin.filter.status.won') }}</option>
+                            <option value="lost">{{ tService.t('admin.filter.status.lost') }}</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Bulk Delete Button -->
+                <button (click)="bulkDelete()" [style.display]="hasSelectedBets ? 'flex' : 'none'" class="row-action-btn btn-delete" style="padding: 0.6rem 1.2rem; border-radius: 50px; font-size: 0.8rem; font-family: var(--font-heading); font-weight: 700; gap: 0.5rem; align-items: center; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; transition: var(--transition); cursor: pointer; height: fit-content; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.15);">
+                    <i class="fa-solid fa-trash-can"></i> {{ tService.t('admin.bulk.delete', { count: selectedCount }) }}
+                </button>
+            </div>
+        </div>
+        
+        <div class="registry-table-wrap">
+            <table class="registry-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px; text-align: center;">
+                            <input type="checkbox" [(ngModel)]="selectAllChecked" (change)="toggleSelectAll()" style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-gold);">
+                        </th>
+                        <th>{{ tService.t('admin.table.date') }}</th>
+                        <th>{{ tService.t('admin.table.bettor') }}</th>
+                        <th>{{ tService.t('admin.table.match') }}</th>
+                        <th>{{ tService.t('admin.table.selection') }}</th>
+                        <th style="text-align: right;">{{ tService.t('admin.table.stake') }}</th>
+                        <th style="text-align: right;">{{ tService.t('admin.table.payout') }}</th>
+                        <th style="text-align: center;">{{ tService.t('admin.table.status') }}</th>
+                        <th style="text-align: center;">{{ tService.t('admin.table.actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let bet of filteredBets">
+                        <td style="text-align: center; width: 40px;">
+                            <input *ngIf="isBetDeletable(bet)" type="checkbox" [(ngModel)]="selectedBetIds[bet.id!]" (change)="onRowCheckboxChange()" style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-gold);">
+                        </td>
+                        <td style="color: var(--text-secondary); font-size: 0.75rem;">{{ bet.date }}</td>
+                        <td>
+                            <span class="name" style="font-weight: 600; color: #fff;">{{ bet.name }}</span>
+                        </td>
+                        <td style="font-weight: 600;">
+                            {{ tService.translateText(bet.matchName || '') }}
+                            <span *ngIf="getMatchStatusLabel(bet)" 
+                                  [style.color]="getMatchForBet(bet)?.status === 'live' ? '#e74c3c' : '#2ecc71'"
+                                  style="font-size: 0.7rem; font-weight: 700; margin-left: 0.25rem;">
+                                {{ getMatchStatusLabel(bet) }}
+                            </span>
+                        </td>
+                        <td>
+                            <span style="font-weight: 500;">{{ getBetDisplaySelection(bet) }}</span>
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: #fff;">{{ formatCurrency(bet.stake) }}</td>
+                        <td style="text-align: right; font-weight: 700;" 
+                            [style.color]="bet.status === 'won' ? 'var(--success)' : bet.status === 'lost' ? 'var(--danger)' : 'var(--text-secondary)'">
+                            {{ bet.status === 'pending' ? '...' : formatCurrency(getBetPayout(bet)) }}
+                        </td>
+                        <td style="text-align: center;">
+                            <span [class]="'status-tag ' + bet.status">{{ getBetStatusText(bet.status) }}</span>
+                        </td>
+                        <td style="text-align: center;">
+                            <div class="admin-actions">
+                                <button *ngIf="currentUser.username === 'admin'" class="row-action-btn btn-won" (click)="settleBet(bet.id, 'won')" [title]="tService.t('status.tag.won')"><i class="fa-solid fa-check"></i></button>
+                                <button *ngIf="currentUser.username === 'admin'" class="row-action-btn btn-lost" (click)="settleBet(bet.id, 'lost')" [title]="tService.t('status.tag.lost')"><i class="fa-solid fa-xmark"></i></button>
+                                <button *ngIf="isBetDeletable(bet)" class="row-action-btn btn-delete" (click)="deleteBet(bet.id)" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div *ngIf="filteredBets.length === 0" class="table-empty-state">
+                <i class="fa-solid fa-folder-open"></i>
+                <p>{{ tService.t('admin.table.empty') }}</p>
+            </div>
+        </div>
+    </section>
+        </div>
+
+        <!-- Right Sidebar Area -->
+        <aside class="app-sidebar right-sidebar">
+            <div class="sidebar-widget player-showcase">
+                <h3 class="widget-title">
+                    <i class="fa-solid fa-star gold-star" style="color: var(--accent-gold); margin-right: 0.25rem;"></i>
+                    {{ tService.currentLang() === 'vi' ? 'SIÊU SAO WC 2026' : 'WC 2026 STARS' }}
+                </h3>
+                <div class="player-image-wrap">
+                    <img src="world_cup_players.png" alt="World Cup 2026 Players" class="sidebar-player-img">
+                </div>
+                <div class="widget-footer">
+                    <p>{{ tService.currentLang() === 'vi' ? 'Hội tụ những siêu sao bóng đá hàng đầu thế giới chuẩn bị tỏa sáng tại World Cup 2026!' : 'Top world-class soccer stars ready to shine at the upcoming World Cup 2026!' }}</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<!-- BET REGISTRATION FORM MODAL (Thông Tin Người Cược) -->
+<div class="modal" [class.open]="showBetModal">
+    <div class="modal-content" *ngIf="selectedMatch">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-file-signature"></i> {{ tService.t('modal.title') }}</h3>
+            <button class="modal-close-btn" (click)="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <form (submit)="handleBetSubmit(); $event.preventDefault()">
+            <!-- Selected Bet Details Preview -->
+            <div class="bet-details-preview">
+                <div class="preview-row">
+                    <span class="label">{{ tService.t('modal.match') }}</span>
+                    <strong class="value">
+                        <img [src]="getFlagUrl(selectedMatch.homeTeamFlag)" [alt]="selectedMatch.homeTeamName" style="width: 24px; height: 16px; object-fit: cover; border-radius: 2px; vertical-align: middle; margin-right: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                        {{ tService.translateText(selectedMatch.homeTeamName) }} 
+                        vs 
+                        <img [src]="getFlagUrl(selectedMatch.awayTeamFlag)" [alt]="selectedMatch.awayTeamName" style="width: 24px; height: 16px; object-fit: cover; border-radius: 2px; vertical-align: middle; margin-right: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                        {{ tService.translateText(selectedMatch.awayTeamName) }}
+                    </strong>
+                </div>
+                <div class="preview-row" style="margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+                    <span class="label">{{ tService.currentLang() === 'vi' ? 'Thời gian' : 'Time' }}</span>
+                    <span class="value" style="color: var(--accent-gold); font-weight: 600;">
+                        <i class="fa-regular fa-clock"></i> {{ tService.translateText(selectedMatch.time) }} {{ tService.currentLang() === 'vi' ? '(Giờ VN)' : '(ICT)' }}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Bet Selection Dropdown -->
+            <div class="form-group">
+                <label for="bettor-selection"><i class="fa-solid fa-circle-chevron-right"></i> {{ tService.t('modal.select') }}</label>
+                <select id="bettor-selection" [(ngModel)]="betForm.selection" (change)="onSelectionChange()" name="selection"
+                        style="background: #04070d; border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; color: var(--text-primary); font-family: var(--font-body); font-size: 0.9rem; outline: none; cursor: pointer; transition: var(--transition);" required>
+                    <option value="homeWin">{{ tService.translateText(selectedMatch.homeTeamName) }} {{ tService.currentLang() === 'vi' ? 'Thắng' : 'Win' }}</option>
+                    <option value="awayWin">{{ tService.translateText(selectedMatch.awayTeamName) }} {{ tService.currentLang() === 'vi' ? 'Thắng' : 'Win' }}</option>
+                </select>
+            </div>
+            
+            <!-- Bettor Personal Info Display (Logged in user info) -->
+            <div class="form-group" *ngIf="currentUser" style="margin-bottom: 1.5rem;">
+                <label><i class="fa-solid fa-user"></i> {{ tService.t('modal.bettor_name') }}</label>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; color: var(--accent-gold); font-weight: 600; font-size: 0.9rem;">
+                    {{ currentUser.fullName }} (@{{ currentUser.username }})
+                </div>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1rem;">
+                <label for="bettor-stake"><i class="fa-solid fa-lock"></i> {{ tService.t('modal.stake') }}</label>
+                <div class="input-currency-wrap">
+                    <span class="currency-prefix">₫</span>
+                    <input type="number" id="bettor-stake" [value]="betForm.stake" readonly style="background: rgba(255, 255, 255, 0.03); color: var(--accent-gold); cursor: not-allowed; border-color: rgba(255, 255, 255, 0.1); font-weight: 700; text-shadow: 0 0 5px rgba(245, 176, 65, 0.2);" required>
+                </div>
+            </div>
+
+            <button type="submit" class="submit-bet-btn">
+                <i class="fa-solid fa-circle-check"></i> {{ tService.t('modal.confirm') }}
+            </button>
+        </form>
+    </div>
+</div>
+
+</div>
+
+<ng-template #guestAuthLayout>
+    <div class="auth-page-wrapper" style="display: flex; min-height: 100vh; background: var(--bg-primary); position: relative; overflow: hidden; font-family: var(--font-body); width: 100%;">
+        <style>
+            @media (max-width: 992px) {
+                .auth-hero-side {
+                    display: none !important;
+                }
+                .auth-form-side {
+                    flex: 1 !important;
+                    padding: 1.5rem !important;
+                    background: radial-gradient(circle, rgba(11, 17, 33, 0.6) 0%, rgba(5, 8, 16, 0.98) 100%), url('/bet-wc/usa_soccer_theme.png') no-repeat center center !important;
+                    background-size: cover !important;
+                }
+            }
+        </style>
+
+        <!-- Left Side: Hero Showcase (Statue of Liberty & Soccer Theme) -->
+        <div class="auth-hero-side" style="flex: 1.25; background: radial-gradient(circle, rgba(11, 17, 33, 0.1) 0%, rgba(5, 8, 16, 0.75) 100%), url('/bet-wc/usa_soccer_theme.png') no-repeat center center; background-size: cover; display: flex; flex-direction: column; justify-content: space-between; padding: 4rem; position: relative; border-right: 1px solid rgba(255, 255, 255, 0.05);">
+            <!-- Top brand logo -->
+            <div style="display: flex; align-items: center; gap: 0.75rem; z-index: 2;">
+                <i class="fa-solid fa-trophy trophy-icon" style="font-size: 2.2rem; color: var(--accent-gold); text-shadow: 0 0 15px rgba(245,176,65,0.4);"></i>
+                <div style="text-align: left;">
+                    <span style="font-family: var(--font-heading); font-weight: 900; font-size: 1.4rem; color: #fff; text-transform: uppercase; letter-spacing: 1px; display: block; line-height: 1.2;">
+                        {{ tService.t('app.title') }}
+                    </span>
+                    <span style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600;">
+                        {{ tService.t('app.subtitle') }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Middle text / Badge -->
+            <div style="z-index: 2; max-width: 500px; margin-top: auto; margin-bottom: auto;">
+                <div style="font-size: 0.7rem; color: var(--accent-gold); border: 1px solid rgba(245, 176, 65, 0.4); border-radius: 20px; padding: 0.3rem 0.8rem; display: inline-block; margin-bottom: 1.25rem; background: rgba(245, 176, 65, 0.1); font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">
+                    <i class="fa-solid fa-landmark"></i> USA 2026 Edition
+                </div>
+                <h2 style="font-family: var(--font-heading); font-weight: 900; font-size: 2.6rem; color: #fff; line-height: 1.2; text-shadow: 0 2px 10px rgba(0,0,0,0.6); margin-bottom: 1.25rem;">
+                    {{ tService.currentLang() === 'vi' ? 'Hệ Thống Đặt Cược FIFA World Cup 2026' : 'FIFA World Cup 2026 Betting System' }}
+                </h2>
+                <p style="color: var(--text-secondary); font-size: 1rem; line-height: 1.6; text-shadow: 0 1px 5px rgba(0,0,0,0.5);">
+                    {{ tService.currentLang() === 'vi' 
+                       ? 'Theo dõi trực tiếp kết quả các trận đấu, đặt cược nhanh chóng và cập nhật bảng xếp hạng thời gian thực.' 
+                       : 'Follow live matches, place bets instantly, and stay updated with real-time statistics.' }}
+                </p>
+            </div>
+
+            <!-- Footer info -->
+            <div style="z-index: 2; font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; margin-top: auto;">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>{{ tService.currentLang() === 'vi' ? 'Ứng dụng chạy trên dữ liệu thời gian thực từ FIFA API' : 'App runs on real-time data from FIFA API' }}</span>
+            </div>
+            
+            <!-- Overlay to blend edge -->
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(to right, transparent 60%, rgba(5, 8, 16, 0.95) 100%); pointer-events: none;"></div>
+        </div>
+
+        <!-- Right Side: Form Side -->
+        <div class="auth-form-side" style="flex: 0.85; display: flex; align-items: center; justify-content: center; padding: 4rem; background: rgba(5, 8, 16, 0.98); position: relative; z-index: 2;">
+            <!-- Subtle background glows behind form on the right -->
+            <div style="position: absolute; width: 300px; height: 300px; background: rgba(245, 176, 65, 0.03); border-radius: 50%; filter: blur(70px); top: 10%; right: 10%; pointer-events: none;"></div>
+            <div style="position: absolute; width: 350px; height: 350px; background: rgba(16, 185, 129, 0.02); border-radius: 50%; filter: blur(80px); bottom: 10%; left: 10%; pointer-events: none;"></div>
+
+            <div class="auth-card" style="background: rgba(19, 27, 46, 0.6); border: 1px solid rgba(245, 176, 65, 0.25); border-radius: var(--radius-lg); width: 100%; max-width: 400px; padding: 2.5rem; backdrop-filter: blur(25px); box-shadow: 0 15px 40px rgba(0,0,0,0.5), 0 0 15px rgba(245, 176, 65, 0.05); z-index: 10; animation: fadeIn 0.5s ease-out; position: relative;">
+                <!-- Logo Section (Only visible on smaller layouts when hero is hidden) -->
+                <div class="logo-mobile-only" style="text-align: center; margin-bottom: 1.5rem; display: none;">
+                    <i class="fa-solid fa-trophy trophy-icon" style="font-size: 2.5rem; color: var(--accent-gold); margin-bottom: 0.5rem; display: inline-block;"></i>
+                    <h1 style="font-family: var(--font-heading); font-weight: 900; font-size: 1.5rem; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-transform: uppercase; margin: 0;">
+                        {{ tService.t('app.title') }}
+                    </h1>
+                </div>
+                <style>
+                    @media (max-width: 992px) {
+                        .logo-mobile-only {
+                            display: block !important;
+                        }
+                    }
+                </style>
+
+                <!-- Form Title -->
+                <h3 style="font-family: var(--font-heading); font-weight: 800; font-size: 1.35rem; color: #fff; margin-bottom: 1.75rem; text-align: center; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-user-lock" style="color: var(--accent-gold);"></i>
+                    {{ authForm.isRegister 
+                       ? (tService.currentLang() === 'vi' ? 'Đăng Ký Tài Khoản' : 'Register Account') 
+                       : (tService.currentLang() === 'vi' ? 'Đăng Nhập Hệ Thống' : 'System Login') }}
+                </h3>
+
+                <!-- Form -->
+                <form (submit)="handleAuthSubmit(); $event.preventDefault()" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                    <!-- Full Name (Only for Register) -->
+                    <div class="form-group" *ngIf="authForm.isRegister">
+                        <label for="page-auth-fullName" style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 600;"><i class="fa-solid fa-id-card"></i> {{ tService.currentLang() === 'vi' ? 'Họ và Tên' : 'Full Name' }}</label>
+                        <input type="text" id="page-auth-fullName" [(ngModel)]="authForm.fullName" name="fullName" placeholder="{{ tService.currentLang() === 'vi' ? 'Nhập họ và tên...' : 'Enter full name...' }}" required style="background: #04070d; border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; color: var(--text-primary); width: 100%; font-family: var(--font-body); outline: none;">
+                    </div>
+
+                    <!-- Username -->
+                    <div class="form-group">
+                        <label for="page-auth-username" style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 600;"><i class="fa-solid fa-futbol"></i> {{ tService.currentLang() === 'vi' ? 'Tên Đăng Nhập' : 'Username' }}</label>
+                        <input type="text" id="page-auth-username" [(ngModel)]="authForm.username" name="username" placeholder="{{ tService.currentLang() === 'vi' ? 'Nhập tên đăng nhập...' : 'Enter username...' }}" required style="background: #04070d; border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; color: var(--text-primary); width: 100%; font-family: var(--font-body); outline: none;">
+                    </div>
+
+                    <!-- Password -->
+                    <div class="form-group">
+                        <label for="page-auth-password" style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 600;"><i class="fa-solid fa-lock"></i> {{ tService.currentLang() === 'vi' ? 'Mật Khẩu' : 'Password' }}</label>
+                        <input type="password" id="page-auth-password" [(ngModel)]="authForm.password" name="password" placeholder="{{ tService.currentLang() === 'vi' ? 'Nhập mật khẩu...' : 'Enter password...' }}" required style="background: #04070d; border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; color: var(--text-primary); width: 100%; font-family: var(--font-body); outline: none;">
+                    </div>
+                    
+                    <button type="submit" class="submit-bet-btn" style="margin-top: 0.75rem; padding: 1rem; border-radius: var(--radius-sm); font-weight: bold; width: 100%; border: none; cursor: pointer;">
+                        <i class="fa-solid fa-circle-check"></i> 
+                        {{ authForm.isRegister 
+                           ? (tService.currentLang() === 'vi' ? 'ĐĂNG KÝ NGAY' : 'REGISTER NOW') 
+                           : (tService.currentLang() === 'vi' ? 'ĐĂNG NHẬP' : 'LOGIN') }}
+                    </button>
+
+                    <!-- Toggle register/login link -->
+                    <div style="text-align: center; font-size: 0.85rem; margin-top: 0.5rem;">
+                        <a href="#" (click)="toggleAuthMode(); $event.preventDefault()" style="color: var(--accent-gold); text-decoration: none; font-weight: 600; transition: var(--transition);">
+                            {{ authForm.isRegister 
+                               ? (tService.currentLang() === 'vi' ? 'Đã có tài khoản? Đăng nhập' : 'Already have an account? Login') 
+                               : (tService.currentLang() === 'vi' ? 'Chưa có tài khoản? Đăng ký ngay' : 'Don\'t have an account? Register now') }}
+                        </a>
+                    </div>
+                </form>
+                
+                <!-- Language switcher bottom-of-card -->
+                <div style="display: flex; justify-content: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+                    <button (click)="tService.toggleLanguage()" style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); color: var(--accent-gold); font-weight: bold; cursor: pointer; padding: 0.4rem 1rem; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; transition: var(--transition);">
+                        <i class="fa-solid fa-globe"></i> {{ tService.currentLang() === 'vi' ? 'ENGLISH (EN)' : 'TIẾNG VIỆT (VI)' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</ng-template>
+
+<!-- BACKGROUND OVERLAY -->
+<div class="modal-overlay" [class.active]="showBetModal" (click)="closeModal()"></div>
+
+<!-- TOAST NOTIFICATION CONTAINER -->
+<div class="toast-container">
+    <div *ngFor="let toast of toasts" [class]="'toast ' + toast.type" [class.show]="toast.show">
+        <i class="fa-solid toast-icon" 
+           [class.fa-circle-info]="toast.type === 'info'" 
+           [class.fa-circle-check]="toast.type === 'success'" 
+           [class.fa-circle-exclamation]="toast.type === 'danger'"></i>
+        <div class="toast-msg">{{ toast.msg }}</div>
+    </div>
+</div>

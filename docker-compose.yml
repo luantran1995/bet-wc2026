@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend-excel
+    container_name: wc2026-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - excel_data:/app/data
+
+  frontend:
+    build: ./frontend
+    container_name: wc2026-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  excel_data:

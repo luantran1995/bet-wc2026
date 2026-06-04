@@ -1,0 +1,14 @@
+{
+  "name": "wc2026-bet-monorepo",
+  "version": "1.0.0",
+  "description": "WC2026 Betting App Monorepo for Railway Deployment",
+  "main": "backend-excel/server.js",
+  "scripts": {
+    "install:frontend": "cd frontend && npm install",
+    "install:backend": "cd backend-excel && npm install",
+    "build:frontend": "cd frontend && npm run build",
+    "build": "npm run install:frontend && npm run build:frontend && npm run install:backend",
+    "start": "node backend-excel/server.js",
+    "init-data": "node backend-excel/init-data.js"
+  }
+}
