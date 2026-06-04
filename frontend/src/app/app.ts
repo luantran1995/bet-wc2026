@@ -360,6 +360,84 @@ export class App implements OnInit, OnDestroy {
     return ((wonCount / settled.length) * 100).toFixed(2) + '%';
   }
 
+  // Dashboard Stats & Calculations
+  get myBets(): Bet[] {
+    if (!this.currentUser) return [];
+    return this.bets.filter(b => b.username === this.currentUser.username || b.name === this.currentUser.fullName);
+  }
+
+  get myTotalBets(): number {
+    return this.myBets.length;
+  }
+
+  get myWonBets(): number {
+    return this.myBets.filter(b => b.status === 'won').length;
+  }
+
+  get myLostBets(): number {
+    return this.myBets.filter(b => b.status === 'lost').length;
+  }
+
+  get myWinRate(): string {
+    const settled = this.myBets.filter(b => b.status !== 'pending');
+    if (settled.length === 0) return '0.00%';
+    return ((this.myWonBets / settled.length) * 100).toFixed(2) + '%';
+  }
+
+  get myTotalStake(): number {
+    return this.myBets.reduce((acc, b) => acc + Number(b.stake || 0), 0);
+  }
+
+  get myProfitLoss(): number {
+    return this.myBets.reduce((acc, b) => {
+      if (b.status === 'lost') return acc - Number(b.stake || 10000);
+      return acc;
+    }, 0);
+  }
+
+  get leaderboard() {
+    const userMap: Record<string, { name: string; username: string; total: number; won: number; lost: number; profit: number }> = {};
+
+    this.bets.forEach(b => {
+      const username = b.username || b.name;
+      if (!userMap[username]) {
+        userMap[username] = {
+          name: b.name,
+          username: username,
+          total: 0,
+          won: 0,
+          lost: 0,
+          profit: 0
+        };
+      }
+      const entry = userMap[username];
+      entry.total++;
+      if (b.status === 'won') {
+        entry.won++;
+      } else if (b.status === 'lost') {
+        entry.lost++;
+        entry.profit -= Number(b.stake || 10000);
+      }
+    });
+
+    return Object.values(userMap)
+      .map(entry => {
+        const settled = entry.won + entry.lost;
+        const rate = settled > 0 ? ((entry.won / settled) * 100).toFixed(2) + '%' : '0.00%';
+        return {
+          name: entry.name,
+          username: entry.username,
+          totalBets: entry.total,
+          wonBets: entry.won,
+          lostBets: entry.lost,
+          winRate: rate,
+          profitLoss: entry.profit
+        };
+      })
+      .sort((a, b) => b.profitLoss - a.profitLoss || b.wonBets - a.wonBets);
+  }
+
+
   getFlagUrl(emoji: string): string {
     if (!emoji) return 'https://flagcdn.com/un.svg';
 
@@ -399,15 +477,23 @@ export class App implements OnInit, OnDestroy {
   }
 
   getBetDisplaySelection(bet: Bet): string {
+    if (!bet.betType) return '';
     const match = this.matches.find(m => m.id?.toString() === bet.matchId?.toString());
-    if (match) {
-      if (bet.betType === 'homeWin') return this.tService.translateText(match.homeTeamName);
-      if (bet.betType === 'awayWin') return this.tService.translateText(match.awayTeamName);
-      if (bet.betType === 'draw') return this.tService.t('selection.draw');
+    const betTypeLower = bet.betType.toLowerCase();
+    
+    // Legacy support
+    if (bet.betType === 'homeWin') {
+      return match ? this.tService.translateText(match.homeTeamName) : this.tService.t('selection.home');
     }
-    if (bet.betType === 'homeWin') return this.tService.t('selection.home');
-    if (bet.betType === 'awayWin') return this.tService.t('selection.away');
-    return this.tService.t('selection.draw');
+    if (bet.betType === 'awayWin') {
+      return match ? this.tService.translateText(match.awayTeamName) : this.tService.t('selection.away');
+    }
+    if (betTypeLower === 'draw' || betTypeLower === 'hòa') {
+      return this.tService.t('selection.draw');
+    }
+    
+    // Direct team name support
+    return this.tService.translateText(bet.betType);
   }
 
   getBetPayout(bet: Bet): number {

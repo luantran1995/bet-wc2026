@@ -139,7 +139,14 @@ function autoSettleBetsForMatch(match) {
   let updated = false;
   bets.forEach(bet => {
     if (bet.matchId?.toString() === match.id.toString() && bet.status === 'pending') {
-      bet.status = (bet.betType === outcome) ? 'won' : 'lost';
+      let isWon = false;
+      const betTypeLower = (bet.betType || '').toLowerCase();
+      if (outcome === 'homeWin' && bet.betType === match.homeTeamName) isWon = true;
+      else if (outcome === 'awayWin' && bet.betType === match.awayTeamName) isWon = true;
+      else if (outcome === 'draw' && (betTypeLower === 'hòa' || betTypeLower === 'draw')) isWon = true;
+      else if (bet.betType === outcome) isWon = true; // Legacy compatibility
+
+      bet.status = isWon ? 'won' : 'lost';
       bet.payout = bet.status === 'won' ? 0 : -Number(bet.stake || 10000);
       updated = true;
       console.log(`💰 Automatically settled bet ${bet.id} for ${bet.name} as [${bet.status}]`);
@@ -274,12 +281,42 @@ app.use(cors());
 app.use(express.json());
 
 // ─── Excel helpers ───────────────────────────────────────────────────────────
+const ORIGINAL_KEYS = [
+  'id', 'date', 'name', 'username', 'password', 'fullName', 'role',
+  'matchId', 'matchName', 'betType', 'stake', 'status', 'payout',
+  'groupKey', 'round', 'time', 'homeTeamName', 'homeTeamFlag',
+  'awayTeamName', 'awayTeamFlag', 'homeTeamGoals', 'awayTeamGoals',
+  'elapsedMinutes', 'stadium'
+];
+
+function normalizeKeysToCamel(obj) {
+  const normalized = {};
+  for (const [key, val] of Object.entries(obj)) {
+    const matchedKey = ORIGINAL_KEYS.find(k => k.toUpperCase() === key.toUpperCase());
+    if (matchedKey) {
+      normalized[matchedKey] = val;
+    } else {
+      normalized[key] = val;
+    }
+  }
+  return normalized;
+}
+
+function convertKeysToUpper(obj) {
+  const uppercased = {};
+  for (const [key, val] of Object.entries(obj)) {
+    uppercased[key.toUpperCase()] = val;
+  }
+  return uppercased;
+}
+
 function readSheet(filePath, sheetName) {
   try {
     const wb = xlsx.readFile(filePath);
     const ws = wb.Sheets[sheetName || wb.SheetNames[0]];
     if (!ws) return [];
-    return xlsx.utils.sheet_to_json(ws, { defval: '' });
+    const rawRows = xlsx.utils.sheet_to_json(ws, { defval: '' });
+    return rawRows.map(row => normalizeKeysToCamel(row));
   } catch (e) {
     console.warn(`[Excel] Could not read ${filePath}:`, e.message);
     return [];
@@ -293,7 +330,10 @@ function writeSheet(filePath, sheetName, data) {
   } catch {
     wb = xlsx.utils.book_new();
   }
-  const ws = xlsx.utils.json_to_sheet(data);
+  
+  const uppercasedData = (data || []).map(item => convertKeysToUpper(item));
+  const ws = xlsx.utils.json_to_sheet(uppercasedData);
+  
   if (wb.SheetNames.includes(sheetName)) {
     wb.Sheets[sheetName] = ws;
   } else {
@@ -367,6 +407,24 @@ app.get('/api/bets/export', (req, res) => {
 
 app.post('/api/bets', (req, res) => {
   const bets = readSheet(BETS_FILE, 'bets');
+  const matches = readSheet(MATCHES_FILE, 'matches');
+  const match = matches.find(m => m.id?.toString() === req.body.matchId?.toString());
+  
+  let resolvedBetType = req.body.betType || 'homeWin';
+  if (match) {
+    if (req.body.betType === 'homeWin') {
+      resolvedBetType = match.homeTeamName;
+    } else if (req.body.betType === 'awayWin') {
+      resolvedBetType = match.awayTeamName;
+    } else if (req.body.betType === 'draw') {
+      resolvedBetType = 'Draw';
+    }
+  } else {
+    if (req.body.betType === 'draw') {
+      resolvedBetType = 'Draw';
+    }
+  }
+
   const newBet = {
     id:        uuidv4(),
     date:      new Date().toISOString(),
@@ -374,7 +432,7 @@ app.post('/api/bets', (req, res) => {
     username:  req.body.username  || '',
     matchId:   req.body.matchId   || '',
     matchName: req.body.matchName || '',
-    betType:   req.body.betType   || 'homeWin',
+    betType:   resolvedBetType,
     stake:     Number(req.body.stake) || 10000,
     status:    'pending',
     payout:    0,

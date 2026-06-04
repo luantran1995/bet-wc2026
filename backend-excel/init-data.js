@@ -14,9 +14,18 @@ const DATA_DIR = path.join(__dirname, 'data');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
+function convertKeysToUpper(obj) {
+  const uppercased = {};
+  for (const [key, val] of Object.entries(obj)) {
+    uppercased[key.toUpperCase()] = val;
+  }
+  return uppercased;
+}
+
 function writeSheet(filePath, sheetName, data) {
   const wb = xlsx.utils.book_new();
-  const ws = xlsx.utils.json_to_sheet(data);
+  const uppercasedData = (data || []).map(item => convertKeysToUpper(item));
+  const ws = xlsx.utils.json_to_sheet(uppercasedData);
   xlsx.utils.book_append_sheet(wb, ws, sheetName);
   xlsx.writeFile(wb, filePath);
   console.log(`✅ Created: ${filePath}`);

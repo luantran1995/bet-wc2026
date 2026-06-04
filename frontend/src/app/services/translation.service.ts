@@ -14,6 +14,7 @@ export class TranslationService {
       'app.subtitle': 'Hệ Thống Đặt Cược',
       'nav.matches': 'Trận Đấu',
       'nav.bets': 'Danh Sách Đơn Cược',
+      'nav.dashboard': 'Bảng Điều Khiển',
       'matches.title': 'Chọn Trận Đấu & Kèo Cược',
       'matches.tab.all': 'Tất Cả',
       'matches.tab.a_d': 'Bảng A - D',
@@ -75,13 +76,26 @@ export class TranslationService {
       'selection.draw': 'Hòa',
       'auth.error.user_not_found': 'Chưa có tài khoản, hãy đăng ký!',
       'auth.error.wrong_password': 'Vui lòng xem lại thông tin đăng nhập!',
-      'auth.error.username_exists': 'Tên đăng nhập đã tồn tại!'
+      'auth.error.username_exists': 'Tên đăng nhập đã tồn tại!',
+      'dashboard.title': 'BẢNG ĐIỀU KHIỂN & PHÂN TÍCH',
+      'dashboard.total_bets': 'Tổng Lượt Dự Đoán',
+      'dashboard.win_rate': 'Tỉ Lệ Chính Xác',
+      'dashboard.total_stake': 'Tổng Điểm Đã Cược',
+      'dashboard.total_profit': 'Điểm Lợi Nhuận',
+      'dashboard.my_bets': 'LỊCH SỬ KÈO CƯỢC CỦA TÔI',
+      'dashboard.leaderboard': 'BẢNG XẾP HẠNG CAO THỦ',
+      'dashboard.player': 'Người Chơi',
+      'dashboard.predictions': 'Lượt Đoán',
+      'dashboard.accuracy': 'Chính Xác',
+      'dashboard.score': 'Điểm Số',
+      'dashboard.empty_bets': 'Bạn chưa đặt cược trận nào. Hãy chọn một trận đấu ở mục Trận Đấu và tham gia dự đoán!'
     },
     en: {
       'app.title': 'World Cup 2026',
       'app.subtitle': 'Betting System',
       'nav.matches': 'Matches',
       'nav.bets': 'Bet Registry',
+      'nav.dashboard': 'Dashboard',
       'matches.title': 'Choose Match & Place Bet',
       'matches.tab.all': 'All',
       'matches.tab.a_d': 'Groups A - D',
@@ -143,7 +157,19 @@ export class TranslationService {
       'selection.draw': 'Draw',
       'auth.error.user_not_found': 'Account does not exist, please register!',
       'auth.error.wrong_password': 'Please check your login credentials again!',
-      'auth.error.username_exists': 'Username already exists!'
+      'auth.error.username_exists': 'Username already exists!',
+      'dashboard.title': 'BETTING ANALYTICS & DASHBOARD',
+      'dashboard.total_bets': 'Total Predictions',
+      'dashboard.win_rate': 'Accuracy Rate',
+      'dashboard.total_stake': 'Total Points Bet',
+      'dashboard.total_profit': 'Net Points Profit',
+      'dashboard.my_bets': 'MY BETTING HISTORY',
+      'dashboard.leaderboard': 'BETTORS LEADERBOARD',
+      'dashboard.player': 'Bettor',
+      'dashboard.predictions': 'Bets',
+      'dashboard.accuracy': 'Accuracy',
+      'dashboard.score': 'Score',
+      'dashboard.empty_bets': 'You have not placed any bets yet. Select a match to start predicting!'
     }
   };
 
