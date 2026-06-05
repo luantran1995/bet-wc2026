@@ -1,82 +1,83 @@
-# ⚽ Hệ Thống Đặt Cược World Cup 2026 (Angular + Node.js + Excel DB)
+# ⚽ World Cup 2026 Betting System (Angular + Node.js + Excel DB)
 
-Hệ thống đặt cược World Cup 2026 sử dụng cơ sở dữ liệu bằng các tệp **Excel (.xlsx)** lưu tại `backend-excel/data/`. Bạn có thể trực tiếp mở, xem hoặc chỉnh sửa các tệp Excel này rất dễ dàng.
-
----
-
-## 📋 Luật Chơi & Tính Điểm
-
-1. **Số tiền cược**: Mỗi lượt cược mặc định là **10.000 ₫** (hệ thống tự động áp dụng).
-2. **Số lần cược**: Mỗi người chơi chỉ được đặt cược **tối đa 1 lần / trận**. Giao diện sẽ hiển thị nút cược là **ĐÃ CƯỢC** và bị vô hiệu hóa sau khi đặt cược thành công.
-3. **Khóa kèo**: Hệ thống tự động khóa cược khi trận đấu đang diễn ra (**LIVE**) hoặc đã kết thúc (**FT**).
-4. **Quy tắc cửa cược (cột `BETTYPE`)**:
-   - Cược đội nhà hoặc đội khách thắng: Lưu tên đội tuyển bằng tiếng Anh (Ví dụ: `USA`, `France`).
-   - Chọn cửa Hòa: Lưu chữ `Draw` (không sử dụng chữ "hòa" hoặc "hóa").
-5. **Cách tính điểm**:
-   - **Đoán Đúng**: Nhận `0 ₫` (không bị trừ điểm).
-   - **Đoán Sai**: Trừ **-10.000 ₫** vào điểm xếp hạng.
-6. **Vòng loại trực tiếp (Knockout)**: Không có kết quả Hòa. Nếu trận đấu có tỉ số hòa sau 90 phút, hệ thống sẽ tạm dừng kết toán tự động để Admin cập nhật tỉ số hiệp phụ/luân lưu và phân định đội thắng thủ công.
+The World Cup 2026 Betting System uses **Excel (.xlsx)** files stored in `backend-excel/data/` as its database. You can directly open, view, or edit these Excel files very easily.
 
 ---
 
-## 📊 Cấu Trúc Database Excel
+## 📋 Rules & Scoring
 
-Các file Excel đặt tại thư mục `backend-excel/data/`. Tất cả **tiêu đề cột** đều được viết bằng **CHỮ IN HOA**.
-
-* **`accounts.xlsx`**: Lưu tài khoản người dùng.
-  * Các cột: `ID`, `USERNAME`, `PASSWORD`, `FULLNAME`, `ROLE`.
-* **`matches.xlsx`**: Lịch thi đấu (đồng bộ tự động từ FIFA API).
-  * Các cột: `ID`, `GROUPKEY`, `ROUND`, `TIME` (Giờ VN), `HOMETEAMNAME`, `HOMETEAMFLAG`, `AWAYTEAMNAME`, `AWAYTEAMFLAG`, `STATUS`, `HOMETEAMGOALS`, `AWAYTEAMGOALS`, `ELAPSEDMINUTES`, `STADIUM`.
-* **`bets.xlsx`**: Danh sách đơn đặt cược.
-  * Các cột: `ID`, `DATE`, `NAME`, `USERNAME`, `MATCHID`, `MATCHNAME`, `BETTYPE`, `STAKE`, `STATUS` (`pending`/`won`/`lost`), `PAYOUT`.
+1. **Stake**: Each bet defaults to **10,000 ₫** (automatically applied by the system).
+2. **Bet limits**: Each player can only place a bet **at most once per match**. The interface will display the bet button as **BET PLACED** (ĐÃ CƯỢC) and disable it after a successful bet.
+3. **Locking bets**: The system automatically locks bets when a match is in progress (**LIVE**) or has ended (**FT**).
+4. **Bet option rules (column `BETTYPE`)**:
+   - Betting on Home team or Away team win: Save the team name in English (e.g., `USA`, `France`).
+   - Selecting a Draw: Save as `Draw` (do not use Vietnamese equivalents like "hòa" or "hóa").
+5. **Scoring**:
+   - **Correct Prediction**: Receive **0 ₫** (no deduction).
+   - **Incorrect Prediction**: Deduct **-10,000 ₫** from the ranking points.
+6. **Knockout Stage**: No Draw results. If a match is tied after 90 minutes, the system will temporarily pause automatic settlement to allow the Admin to update the extra time/penalty shootout score and manually determine the winning team.
 
 ---
 
-## 🚀 Hướng Dẫn Chạy Dự Án
+## 📊 Excel Database Structure
 
-### Cách 1: Chạy trực tiếp trên máy (Khuyên dùng khi Dev)
-Yêu cầu đã cài đặt **Node.js (v20+)**:
+The Excel files are located in the `backend-excel/data/` directory. All **column headers** are written in **UPPERCASE**.
 
-1. **Cài đặt & Build:**
+* **`accounts.xlsx`**: Stores user accounts.
+  * Columns: `ID`, `USERNAME`, `PASSWORD`, `FULLNAME`, `ROLE`.
+* **`matches.xlsx`**: Match schedule (automatically synchronized from FIFA API).
+  * Columns: `ID`, `GROUPKEY`, `ROUND`, `TIME` (Vietnam Time), `HOMETEAMNAME`, `HOMETEAMFLAG`, `AWAYTEAMNAME`, `AWAYTEAMFLAG`, `STATUS`, `HOMETEAMGOALS`, `AWAYTEAMGOALS`, `ELAPSEDMINUTES`, `STADIUM`.
+* **`bets.xlsx`**: List of placed bets.
+  * Columns: `ID`, `DATE`, `NAME`, `USERNAME`, `MATCHID`, `MATCHNAME`, `BETTYPE`, `STAKE`, `STATUS` (`pending`/`won`/`lost`), `PAYOUT`.
+
+---
+
+## 🚀 Running the Project
+
+### Method 1: Running locally (Recommended for Development)
+Requires **Node.js (v20+)** installed:
+
+1. **Install & Build:**
    ```bash
    npm run build
    ```
-2. **Khởi tạo dữ liệu ban đầu:**
+2. **Initialize initial data:**
    ```bash
    npm run init-data
    ```
-3. **Khởi động server:**
+3. **Start the server:**
    ```bash
    npm run start
    ```
-4. **Truy cập:** [http://localhost:3000](http://localhost:3000) (Trang web tự động chuyển hướng sang `/bet-wc/`).
+4. **Access:** [http://localhost:3000](http://localhost:3000) (The website automatically redirects to `/bet-wc/`).
 
 ---
 
-### Cách 2: Chạy qua Docker
-1. **Khởi chạy container:**
+### Method 2: Running via Docker
+1. **Start the containers:**
    ```bash
    docker-compose up --build -d
    ```
-2. **Khởi tạo dữ liệu Excel ban đầu:**
+2. **Initialize initial Excel data:**
    ```bash
    docker compose exec backend npm run init
    ```
-3. **Truy cập:**
-   - **Giao diện Web:** [http://localhost:80](http://localhost:80)
-   - **API Backend:** [http://localhost:3000/api](http://localhost:3000/api)
+3. **Access:**
+   - **Web Interface:** [http://localhost:80](http://localhost:80)
+   - **Backend API:** [http://localhost:3000/api](http://localhost:3000/api)
 
 ---
 
-## 👤 Tài Khoản Đăng Nhập Mặc Định
+## 👤 Default Login Accounts
 
-| Username | Mật Khẩu | Vai Trò (Role) | Họ Tên | Quyền hạn |
+| Username | Password | Role | Full Name | Permissions |
 | :--- | :--- | :--- | :--- | :--- |
-| **admin** | `admin123` | Admin | Administrator | Quản lý trận đấu, cập nhật tỉ số, phân định kết quả |
-| **lctran** | `lctran123` | Admin | Tran Chanh Luan | Quản lý trận đấu, cập nhật tỉ số, phân định kết quả |
+| **admin** | `admin123` | Admin | Administrator | Manage matches, update scores, determine results |
+| **lctran** | `lctran123` | Admin | Tran Chanh Luan | Manage matches, update scores, determine results |
+
 ---
 
-## 📂 Sơ Đồ Thư Mục
-* `backend-excel/`: Mã nguồn API Node.js & thư mục lưu Excel Database `data/`.
-* `frontend/`: Ứng dụng client viết bằng Angular 21 (quản lý đặt cược, dashboard thống kê & phân trang lịch sử cược 4 đơn/trang).
-* `docker-compose.yml`: Cấu hình Docker để chạy Backend và Frontend song song.
+## 📂 Directory Structure
+* `backend-excel/`: Node.js API source code & the directory storing the Excel Database `data/`.
+* `frontend/`: Client application built with Angular 21 (managing bets, statistics dashboard & bet history pagination with 4 bets/page).
+* `docker-compose.yml`: Docker configuration to run Backend and Frontend in parallel.
