@@ -92,7 +92,7 @@ export class TranslationService {
     },
     en: {
       'app.title': 'World Cup 2026',
-      'app.subtitle': 'Betting System',
+      'app.subtitle': 'X-CUP',
       'nav.matches': 'Matches',
       'nav.bets': 'Bet Registry',
       'nav.dashboard': 'Dashboard',

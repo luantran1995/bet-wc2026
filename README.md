@@ -1,6 +1,6 @@
-# ⚽ World Cup 2026 Betting System (Angular + Node.js + Excel DB)
+# ⚽ World Cup 2026 X-CUP (Angular + Node.js + Excel DB)
 
-The World Cup 2026 Betting System uses **Excel (.xlsx)** files stored in `backend-excel/data/` as its database. You can directly open, view, or edit these Excel files very easily.
+The World Cup 2026 X-CUP uses **Excel (.xlsx)** files stored in `backend-excel/data/` as its database. You can directly open, view, or edit these Excel files very easily.
 
 ---
 
