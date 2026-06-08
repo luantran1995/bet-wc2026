@@ -12,18 +12,18 @@
             </div>
         </div>
         <div class="header-nav" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-            <a href="#" (click)="setSection('matches-section'); $event.preventDefault()" 
+            <a href="#" (click)="setSection('matches-section'); $event.preventDefault()"
                [class.active]="activeSection === 'matches-section'" class="nav-link">
                 <i class="fa-solid fa-gamepad"></i> {{ tService.t('nav.matches') }}
             </a>
-            <a href="#" (click)="setSection('dashboard-section'); $event.preventDefault()" 
+            <a href="#" (click)="setSection('dashboard-section'); $event.preventDefault()"
                [class.active]="activeSection === 'dashboard-section'" class="nav-link">
                 <i class="fa-solid fa-chart-column"></i> {{ tService.t('nav.dashboard') }}
             </a>
-            <a href="#" (click)="setSection('admin-section'); $event.preventDefault()" 
+            <a href="#" (click)="setSection('admin-section'); $event.preventDefault()"
                [class.active]="activeSection === 'admin-section'" class="nav-link">
                 <i class="fa-solid fa-user-shield"></i> {{ tService.t('nav.bets') }}
-                <span class="nav-badge" *ngIf="pendingCount > 0" 
+                <span class="nav-badge" *ngIf="pendingCount > 0"
                       style="background: var(--danger); color: white; padding: 0.1rem 0.4rem; border-radius: 10px; font-size: 0.7rem; margin-left: 0.3rem; font-weight: 700; box-shadow: 0 0 5px rgba(239, 68, 68, 0.4);">
                     {{ pendingCount }}
                 </span>
@@ -71,7 +71,7 @@
 
         <!-- Main Content Area -->
         <div class="main-content">
-    
+
     <!-- SECTION 1: MATCHES LIST -->
     <section id="matches-section" class="app-section" [class.active]="activeSection === 'matches-section'">
 
@@ -83,7 +83,7 @@
                 <!-- 1. Trận đấu (Match select) -->
                 <div class="filter-select-wrap" style="flex: 2; min-width: 200px;">
                     <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 600;">
-                        <i class="fa-solid fa-gamepad" style="color: var(--accent-gold); margin-right: 0.25rem;"></i> 
+                        <i class="fa-solid fa-gamepad" style="color: var(--accent-gold); margin-right: 0.25rem;"></i>
                         {{ tService.currentLang() === 'vi' ? 'Trận đấu' : 'Match' }}
                     </label>
                     <select [(ngModel)]="selectedMatchFilter" (ngModelChange)="onSearchChange()" style="border-radius: var(--radius-sm); border-color: var(--card-border); background: #04070d; padding: 0.45rem 0.75rem; width: 100%; color: var(--text-secondary); cursor: pointer; outline: none; font-size: 0.8rem;">
@@ -115,18 +115,18 @@
 
                 <!-- Sync FIFA API Button -->
                 <button (click)="syncMatches()" class="row-action-btn" [disabled]="isSyncing" style="width: auto; padding: 0.6rem 1.2rem; border-radius: var(--radius-sm); font-size: 0.8rem; font-family: var(--font-heading); font-weight: 700; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; height: 38px; margin-bottom: 2px; transition: var(--transition); border: 1px solid rgba(46, 204, 113, 0.3); background: rgba(46, 204, 113, 0.15); color: #2ecc71;">
-                    <i class="fa-solid fa-arrows-rotate" [class.fa-spin]="isSyncing"></i> 
+                    <i class="fa-solid fa-arrows-rotate" [class.fa-spin]="isSyncing"></i>
                     {{ tService.currentLang() === 'vi' ? 'Cập nhật tỉ số' : 'Sync Live Scores' }}
                 </button>
             </div>
         </div>
-        
+
         <div class="matches-grid">
             <div *ngIf="filteredMatches.length === 0" class="empty-betslip" style="grid-column: 1/-1;">
                 <i class="fa-solid fa-calendar-minus"></i>
                 <p>{{ tService.t('matches.empty') }}</p>
             </div>
-            
+
             <div *ngFor="let match of pagedMatches" class="match-card">
                 <!-- Match meta row -->
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
@@ -187,12 +187,12 @@
             <button (click)="prevMatchPage()" [disabled]="currentPage === 1" class="page-btn" style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); color: var(--text-primary); width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition);">
                 <i class="fa-solid fa-angle-left"></i>
             </button>
-            
+
             <!-- Page Info -->
             <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; margin: 0 0.5rem;">
                 {{ tService.currentLang() === 'vi' ? 'Trang' : 'Page' }} {{ currentPage }} / {{ totalMatchPages }}
             </span>
-            
+
             <!-- Next Button -->
             <button (click)="nextMatchPage()" [disabled]="currentPage === totalMatchPages" class="page-btn" style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); color: var(--text-primary); width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition);">
                 <i class="fa-solid fa-angle-right"></i>
@@ -249,7 +249,7 @@
                         {{ myProfitLoss > 0 ? '+' : '' }}{{ formatCurrency(myProfitLoss) }}
                     </div>
                 </div>
-                <div [style.background]="myProfitLoss >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'" 
+                <div [style.background]="myProfitLoss >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'"
                      [style.color]="myProfitLoss >= 0 ? 'var(--success)' : 'var(--danger)'"
                      style="width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
                     <i [class]="myProfitLoss >= 0 ? 'fa-solid fa-arrow-trend-up' : 'fa-solid fa-arrow-trend-down'"></i>
@@ -264,7 +264,7 @@
                 <h3 style="font-size: 1rem; font-weight: 800; color: #fff; margin-bottom: 1rem; text-transform: uppercase; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.5rem;">
                     <i class="fa-solid fa-history" style="color: var(--accent-gold);"></i> {{ tService.t('dashboard.my_bets') }}
                 </h3>
-                
+
                 <div *ngIf="myBets.length === 0" style="background: rgba(11, 17, 33, 0.4); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 3rem 1.5rem; text-align: center; color: var(--text-secondary); backdrop-filter: blur(10px);">
                     <i class="fa-solid fa-receipt" style="font-size: 3rem; opacity: 0.2; margin-bottom: 1rem; display: block;"></i>
                     <p style="font-size: 0.9rem; line-height: 1.5;">{{ tService.t('dashboard.empty_bets') }}</p>
@@ -275,7 +275,7 @@
 
                 <div class="my-bets-grid" style="display: flex; flex-direction: column; gap: 0.75rem;">
                     <div *ngFor="let bet of myBets" class="my-bet-card" style="background: rgba(11, 17, 33, 0.5); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; transition: var(--transition); backdrop-filter: blur(10px); position: relative;">
-                        
+
                         <!-- Top Header Row of Bet Card -->
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
                             <div>
@@ -319,7 +319,7 @@
                             <div style="display: flex; align-items: center; gap: 0.75rem;">
                                 <!-- Payout/Result display -->
                                 <span *ngIf="bet.status !== 'pending'" style="font-weight: 700;">
-                                    {{ tService.currentLang() === 'vi' ? 'Kết quả:' : 'Payout:' }} 
+                                    {{ tService.currentLang() === 'vi' ? 'Kết quả:' : 'Payout:' }}
                                     <span [style.color]="bet.status === 'won' ? 'var(--success)' : 'var(--danger)'">
                                         {{ bet.status === 'won' ? '0 ₫' : '-' + formatCurrency(bet.stake) }}
                                     </span>
@@ -339,7 +339,7 @@
                 <h3 style="font-size: 1rem; font-weight: 800; color: #fff; margin-bottom: 1rem; text-transform: uppercase; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.5rem;">
                     <i class="fa-solid fa-award" style="color: var(--accent-gold);"></i> {{ tService.t('dashboard.leaderboard') }}
                 </h3>
-                
+
                 <div class="leaderboard-card" style="background: rgba(11, 17, 33, 0.65); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 0.5rem; backdrop-filter: blur(10px);">
                     <div class="leaderboard-list" style="display: flex; flex-direction: column;">
                         <!-- Table header look-alike -->
@@ -351,11 +351,11 @@
                         </div>
 
                         <!-- Rows -->
-                        <div *ngFor="let user of leaderboard; let i = index" 
+                        <div *ngFor="let user of leaderboard; let i = index"
                              [style.background]="currentUser.username === user.username ? 'rgba(245, 176, 65, 0.05)' : 'transparent'"
                              [style.border]="currentUser.username === user.username ? '1px solid rgba(245, 176, 65, 0.25)' : 'none'"
                              style="display: grid; grid-template-columns: 35px 1fr 60px 80px; gap: 0.5rem; padding: 0.75rem; align-items: center; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.03); border-radius: 6px; text-align: right;">
-                            
+
                             <!-- Rank number / icon -->
                             <div style="text-align: center; font-weight: 800;">
                                 <span *ngIf="i === 0" style="color: #f1c40f; font-size: 1.1rem;"><i class="fa-solid fa-medal"></i></span>
@@ -398,7 +398,7 @@
                     <span style="color: var(--text-secondary);">{{ tService.t('admin.winrate') }} <strong style="color: var(--success);">{{ winRate }}</strong></span>
                 </div>
             </div>
-            
+
             <!-- Search & Filters -->
             <div class="admin-controls" style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 1rem; flex-wrap: wrap;">
                 <div style="display: flex; gap: 1rem; flex-wrap: wrap; flex: 1;">
@@ -419,14 +419,14 @@
                         {{ tService.currentLang() === 'vi' ? 'Xuất Excel' : 'Export Excel' }}
                     </button>
                 </div>
-                
+
                 <!-- Bulk Delete Button -->
                 <button (click)="bulkDelete()" [style.display]="hasSelectedBets ? 'flex' : 'none'" class="row-action-btn btn-delete" style="padding: 0.6rem 1.2rem; border-radius: 50px; font-size: 0.8rem; font-family: var(--font-heading); font-weight: 700; gap: 0.5rem; align-items: center; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; transition: var(--transition); cursor: pointer; height: fit-content; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.15);">
                     <i class="fa-solid fa-trash-can"></i> {{ tService.t('admin.bulk.delete', { count: selectedCount }) }}
                 </button>
             </div>
         </div>
-        
+
         <div class="registry-table-wrap">
             <table class="registry-table">
                 <thead>
@@ -455,7 +455,7 @@
                         </td>
                         <td style="font-weight: 600;">
                             {{ tService.translateText(bet.matchName || '') }}
-                            <span *ngIf="getMatchStatusLabel(bet)" 
+                            <span *ngIf="getMatchStatusLabel(bet)"
                                   [style.color]="getMatchForBet(bet)?.status === 'live' ? '#e74c3c' : '#2ecc71'"
                                   style="font-size: 0.7rem; font-weight: 700; margin-left: 0.25rem;">
                                 {{ getMatchStatusLabel(bet) }}
@@ -465,7 +465,7 @@
                             <span style="font-weight: 500;">{{ getBetDisplaySelection(bet) }}</span>
                         </td>
                         <td style="text-align: right; font-weight: 700; color: #fff;">{{ formatCurrency(bet.stake) }}</td>
-                        <td style="text-align: right; font-weight: 700;" 
+                        <td style="text-align: right; font-weight: 700;"
                             [style.color]="bet.status === 'won' ? 'var(--success)' : bet.status === 'lost' ? 'var(--danger)' : 'var(--text-secondary)'">
                             {{ bet.status === 'pending' ? '...' : formatCurrency(getBetPayout(bet)) }}
                         </td>
@@ -494,12 +494,12 @@
             <button (click)="prevBetsPage()" [disabled]="betsCurrentPage === 1" class="page-btn" style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); color: var(--text-primary); width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition);">
                 <i class="fa-solid fa-angle-left"></i>
             </button>
-            
+
             <!-- Page Info -->
             <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; margin: 0 0.5rem;">
                 {{ tService.currentLang() === 'vi' ? 'Trang' : 'Page' }} {{ betsCurrentPage }} / {{ totalBetPages }}
             </span>
-            
+
             <!-- Next Button -->
             <button (click)="nextBetsPage()" [disabled]="betsCurrentPage === totalBetPages" class="page-btn" style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); color: var(--text-primary); width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition);">
                 <i class="fa-solid fa-angle-right"></i>
@@ -533,7 +533,7 @@
             <h3><i class="fa-solid fa-file-signature"></i> {{ tService.t('modal.title') }}</h3>
             <button class="modal-close-btn" (click)="closeModal()"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        
+
         <form id="bet-submission-form" (submit)="handleBetSubmit(); $event.preventDefault()">
             <!-- Selected Bet Details Preview -->
             <div class="bet-details-preview">
@@ -541,8 +541,8 @@
                     <span class="label">{{ tService.t('modal.match') }}</span>
                     <strong class="value">
                         <img [src]="getFlagUrl(selectedMatch.homeTeamFlag)" [alt]="selectedMatch.homeTeamName" style="width: 24px; height: 16px; object-fit: cover; border-radius: 2px; vertical-align: middle; margin-right: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                        {{ tService.translateText(selectedMatch.homeTeamName) }} 
-                        vs 
+                        {{ tService.translateText(selectedMatch.homeTeamName) }}
+                        vs
                         <img [src]="getFlagUrl(selectedMatch.awayTeamFlag)" [alt]="selectedMatch.awayTeamName" style="width: 24px; height: 16px; object-fit: cover; border-radius: 2px; vertical-align: middle; margin-right: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
                         {{ tService.translateText(selectedMatch.awayTeamName) }}
                     </strong>
@@ -554,7 +554,7 @@
                     </span>
                 </div>
             </div>
-            
+
             <!-- Bet Selection Dropdown -->
             <div class="form-group">
                 <label for="bettor-selection"><i class="fa-solid fa-circle-chevron-right"></i> {{ tService.t('modal.select') }}</label>
@@ -565,7 +565,7 @@
                     <option value="draw">{{ tService.currentLang() === 'vi' ? 'Hòa (Draw)' : 'Draw' }}</option>
                 </select>
             </div>
-            
+
             <!-- Bettor Personal Info Display (Logged in user info) -->
             <div class="form-group" *ngIf="currentUser" style="margin-bottom: 1.5rem;">
                 <label><i class="fa-solid fa-user"></i> {{ tService.t('modal.bettor_name') }}</label>
@@ -573,7 +573,7 @@
                     {{ currentUser.fullName }} (@{{ currentUser.username }})
                 </div>
             </div>
-            
+
             <div class="form-group" style="margin-top: 1rem;">
                 <label for="bettor-stake"><i class="fa-solid fa-lock"></i> {{ tService.t('modal.stake') }}</label>
                 <div class="input-currency-wrap">
@@ -628,11 +628,11 @@
                     <i class="fa-solid fa-landmark"></i> USA 2026 Edition
                 </div>
                 <h2 style="font-family: var(--font-heading); font-weight: 900; font-size: 2.6rem; color: #fff; line-height: 1.2; text-shadow: 0 2px 10px rgba(0,0,0,0.6); margin-bottom: 1.25rem;">
-                    {{ tService.currentLang() === 'vi' ? 'Hệ Thống Đặt Cược FIFA World Cup 2026' : 'FIFA World Cup 2026 Betting System' }}
+                    {{ tService.currentLang() === 'vi' ? 'X-CUP' : 'X-CUP' }}
                 </h2>
                 <p style="color: var(--text-secondary); font-size: 1rem; line-height: 1.6; text-shadow: 0 1px 5px rgba(0,0,0,0.5);">
-                    {{ tService.currentLang() === 'vi' 
-                       ? 'Theo dõi trực tiếp kết quả các trận đấu, đặt cược nhanh chóng và cập nhật bảng xếp hạng thời gian thực.' 
+                    {{ tService.currentLang() === 'vi'
+                       ? 'Theo dõi trực tiếp kết quả các trận đấu, đặt cược nhanh chóng và cập nhật bảng xếp hạng thời gian thực.'
                        : 'Follow live matches, place bets instantly, and stay updated with real-time statistics.' }}
                 </p>
             </div>
@@ -642,7 +642,7 @@
                 <i class="fa-solid fa-circle-info"></i>
                 <span>{{ tService.currentLang() === 'vi' ? 'Ứng dụng chạy trên dữ liệu thời gian thực từ FIFA API' : 'App runs on real-time data from FIFA API' }}</span>
             </div>
-            
+
             <!-- Overlay to blend edge -->
             <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(to right, transparent 60%, rgba(5, 8, 16, 0.95) 100%); pointer-events: none;"></div>
         </div>
@@ -672,8 +672,8 @@
                 <!-- Form Title -->
                 <h3 style="font-family: var(--font-heading); font-weight: 800; font-size: 1.35rem; color: #fff; margin-bottom: 1.75rem; text-align: center; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
                     <i class="fa-solid fa-user-lock" style="color: var(--accent-gold);"></i>
-                    {{ authForm.isRegister 
-                       ? (tService.currentLang() === 'vi' ? 'Đăng Ký Tài Khoản' : 'Register Account') 
+                    {{ authForm.isRegister
+                       ? (tService.currentLang() === 'vi' ? 'Đăng Ký Tài Khoản' : 'Register Account')
                        : (tService.currentLang() === 'vi' ? 'Đăng Nhập Hệ Thống' : 'System Login') }}
                 </h3>
 
@@ -696,24 +696,24 @@
                         <label for="page-auth-password" style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 600;"><i class="fa-solid fa-lock"></i> {{ tService.currentLang() === 'vi' ? 'Mật Khẩu' : 'Password' }}</label>
                         <input type="password" id="page-auth-password" [(ngModel)]="authForm.password" name="password" placeholder="{{ tService.currentLang() === 'vi' ? 'Nhập mật khẩu...' : 'Enter password...' }}" required style="background: #04070d; border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; color: var(--text-primary); width: 100%; font-family: var(--font-body); outline: none;">
                     </div>
-                    
+
                     <button type="submit" class="submit-bet-btn" style="margin-top: 0.75rem; padding: 1rem; border-radius: var(--radius-sm); font-weight: bold; width: 100%; border: none; cursor: pointer;">
-                        <i class="fa-solid fa-circle-check"></i> 
-                        {{ authForm.isRegister 
-                           ? (tService.currentLang() === 'vi' ? 'ĐĂNG KÝ NGAY' : 'REGISTER NOW') 
+                        <i class="fa-solid fa-circle-check"></i>
+                        {{ authForm.isRegister
+                           ? (tService.currentLang() === 'vi' ? 'ĐĂNG KÝ NGAY' : 'REGISTER NOW')
                            : (tService.currentLang() === 'vi' ? 'ĐĂNG NHẬP' : 'LOGIN') }}
                     </button>
 
                     <!-- Toggle register/login link -->
                     <div style="text-align: center; font-size: 0.85rem; margin-top: 0.5rem;">
                         <a href="#" (click)="toggleAuthMode(); $event.preventDefault()" style="color: var(--accent-gold); text-decoration: none; font-weight: 600; transition: var(--transition);">
-                            {{ authForm.isRegister 
-                               ? (tService.currentLang() === 'vi' ? 'Đã có tài khoản? Đăng nhập' : 'Already have an account? Login') 
+                            {{ authForm.isRegister
+                               ? (tService.currentLang() === 'vi' ? 'Đã có tài khoản? Đăng nhập' : 'Already have an account? Login')
                                : (tService.currentLang() === 'vi' ? 'Chưa có tài khoản? Đăng ký ngay' : 'Don\'t have an account? Register now') }}
                         </a>
                     </div>
                 </form>
-                
+
                 <!-- Language switcher bottom-of-card -->
                 <div style="display: flex; justify-content: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.05);">
                     <button (click)="tService.toggleLanguage()" style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); color: var(--accent-gold); font-weight: bold; cursor: pointer; padding: 0.4rem 1rem; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; transition: var(--transition);">
@@ -731,9 +731,9 @@
 <!-- TOAST NOTIFICATION CONTAINER -->
 <div class="toast-container">
     <div *ngFor="let toast of toasts" [class]="'toast ' + toast.type" [class.show]="toast.show">
-        <i class="fa-solid toast-icon" 
-           [class.fa-circle-info]="toast.type === 'info'" 
-           [class.fa-circle-check]="toast.type === 'success'" 
+        <i class="fa-solid toast-icon"
+           [class.fa-circle-info]="toast.type === 'info'"
+           [class.fa-circle-check]="toast.type === 'success'"
            [class.fa-circle-exclamation]="toast.type === 'danger'"></i>
         <div class="toast-msg">{{ toast.msg }}</div>
     </div>
