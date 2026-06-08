@@ -270,9 +270,47 @@ class WcBetServer {
   }
 
   /**
+   * Copies template Excel files to the active data directory if they do not exist.
+   * This is crucial when running on Railway with a persistent volume mounted on the data directory,
+   * which would otherwise hide the initial committed Excel files.
+   */
+  copyInitialDataIfMissing() {
+    const initialDataDir = path.join(__dirname, 'initial-data');
+    
+    // Ensure data directory exists
+    if (!fs.existsSync(this.dataDir)) {
+      console.log(`📁 Creating data directory: ${this.dataDir}`);
+      fs.mkdirSync(this.dataDir, { recursive: true });
+    }
+
+    const filesToCopy = ['accounts.xlsx', 'bets.xlsx', 'matches.xlsx'];
+    
+    filesToCopy.forEach(fileName => {
+      const destPath = path.join(this.dataDir, fileName);
+      const srcPath = path.join(initialDataDir, fileName);
+      
+      if (!fs.existsSync(destPath)) {
+        if (fs.existsSync(srcPath)) {
+          console.log(`📦 Copying initial database template: ${fileName} -> ${this.dataDir}`);
+          try {
+            fs.copyFileSync(srcPath, destPath);
+          } catch (err) {
+            console.error(`❌ Failed to copy initial ${fileName}:`, err.message);
+          }
+        } else {
+          console.warn(`⚠️ Initial file ${fileName} not found in template directory: ${initialDataDir}`);
+        }
+      } else {
+        console.log(`✅ Database file already exists: ${fileName}`);
+      }
+    });
+  }
+
+  /**
    * Starts the Web Server listening on the configured PORT.
    */
   start() {
+    this.copyInitialDataIfMissing();
     this.configureMiddleware();
     this.registerRoutes();
     this.configureFrontendServing();

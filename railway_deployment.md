@@ -45,6 +45,10 @@ Since the root [package.json](./package.json) contains scripts to build the Angu
      ```
    - Set the size (e.g., `1 GB` or `5 GB` is more than enough).
 
+   > [!NOTE]
+   > **How Initial Data is Kept**: Because Railway volumes start empty, they hide any Excel files compiled into the Docker image under `/app/backend-excel/data`.
+   > To solve this, the server keeps a read-only template of your checked-in Excel files in `/app/backend-excel/initial-data`. On first startup, if the volume directory is empty, the application automatically copies the template Excel files (`accounts.xlsx`, `bets.xlsx`, and `matches.xlsx`) into your persistent volume. Subsequent data updates are then saved directly to the volume, securing both your initial configuration and all live user bets!
+
 5. **Expose the app**:
    - Go to your service's **Settings** tab.
    - Under **Networking**, click **Generate Domain** to get a public URL (e.g., `https://wc2026-production.up.railway.app`).
@@ -75,3 +79,5 @@ When deploying separate containers, you need to link the Nginx proxy to the back
 > [!IMPORTANT]
 > **Data Persistence Warning**
 > Since this project uses an Excel-based database, any write operations (registering users, placing bets) are saved directly onto the server disk. You **must attach a volume** to your backend service (using mount path `/app/backend-excel/data` for Option 1, or `/app/data` for Option 2) to prevent all data from being wiped out when the service restarts or redeploys.
+> 
+> *Note on Initial Data*: Railway volumes are blank by default. The system has been modified to automatically copy the pre-seeded Excel databases from `initial-data/` to the volume directory on the first run, so you won't lose your initial accounts/matches. Subsequent deployments will not overwrite your active data volume.

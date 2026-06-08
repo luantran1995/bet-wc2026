@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const ExcelService = require('./src/services/ExcelService');
 const MatchService = require('./src/services/MatchService');
@@ -59,6 +60,26 @@ class DataInitializer {
 
     // ─── 3. SEED BETS (Empty initially) ─────────────────────────────────────
     this.excelService.writeSheet(path.join(this.dataDir, 'bets.xlsx'), 'bets', []);
+
+    // ─── 4. COPY TO INITIAL-DATA FOR GIT / RAILWAY VOLUMES ───────────────────
+    const initialDataDir = path.join(__dirname, 'initial-data');
+    if (!fs.existsSync(initialDataDir)) {
+      fs.mkdirSync(initialDataDir, { recursive: true });
+    }
+
+    const filesToCopy = ['accounts.xlsx', 'bets.xlsx', 'matches.xlsx'];
+    filesToCopy.forEach(fileName => {
+      const srcPath = path.join(this.dataDir, fileName);
+      const destPath = path.join(initialDataDir, fileName);
+      if (fs.existsSync(srcPath)) {
+        try {
+          fs.copyFileSync(srcPath, destPath);
+          console.log(`📦 Synced seed database to template: ${fileName}`);
+        } catch (err) {
+          console.error(`❌ Failed to sync seed template ${fileName}:`, err.message);
+        }
+      }
+    });
 
     console.log('\n🎉 Data initialized successfully!');
   }
