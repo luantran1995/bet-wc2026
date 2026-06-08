@@ -11,7 +11,7 @@ export class TranslationService {
   private translations: Record<Language, Record<string, string>> = {
     vi: {
       'app.title': 'World Cup 2026',
-      'app.subtitle': 'Hệ Thống Đặt Cược',
+      'app.subtitle': 'X-CUP',
       'nav.matches': 'Trận Đấu',
       'nav.bets': 'Danh Sách Đơn Cược',
       'nav.dashboard': 'Bảng Điều Khiển',
