@@ -29,11 +29,10 @@ Since the root [package.json](./package.json) contains scripts to build the Angu
    - Click **New Project** -> **Deploy from GitHub repo**.
    - Select your repository.
 
-3. **Configure the Service settings**:
-   Railway will automatically detect the root Node.js project and run the build command.
-   - Go to your service's **Settings** tab.
-   - Under **Build Command**, verify it runs: `npm run build`
-   - Under **Start Command**, verify it runs: `npm run start`
+3. **Service detection and builds**:
+   Railway will automatically detect the root [Dockerfile](./Dockerfile) and build it using Docker (bypassing Nixpacks/Railpack, which avoids download failures like "Failed to ensure mise is installed").
+   - Under **Build Command**, keep it empty (default) as the Dockerfile handles the multi-stage build.
+   - Under **Start Command**, keep it empty (default) as the Dockerfile defines the start command.
 
 4. **Add a Persistent Volume (Crucial for Excel DB)**:
    Since the Express server saves users and bets to Excel files inside the container, you **must** use a volume to prevent data loss on restarts or redeployments:
