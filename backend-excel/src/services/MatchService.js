@@ -473,10 +473,19 @@ class MatchService {
 
     const existingMatches = fs.existsSync(this.matchesFile) ? this.excelService.readSheet(this.matchesFile, 'matches') : [];
 
-    // Simulate/Automatic score updates based on local system time for matches that are 'scheduled'
     const now = new Date();
 
-    // Known/Correct results from Flashscore.vn to override or correct API lag
+    // 1. Scrape real-time results from Flashscore.vn
+    let scrapedMatches = [];
+    try {
+      console.log('🌐 Scraping real-time match data from Flashscore.vn...');
+      scrapedMatches = await this.scrapeFlashscore(processedMatches);
+      console.log(`✅ Scraped ${scrapedMatches.length} matches from Flashscore.vn.`);
+    } catch (scrapeErr) {
+      console.warn(`⚠️ Flashscore scraper failed: ${scrapeErr.message}. Falling back to simulation...`);
+    }
+
+    // 2. Known/Correct results from Flashscore.vn to override or correct API lag (as secondary fallback)
     const match1Time = this.parseVnTimeToDate('2026-06-12 02:00');
     const match2Time = this.parseVnTimeToDate('2026-06-12 09:00');
     const knownScores = {};
@@ -489,7 +498,6 @@ class MatchService {
     }
 
     if (match2Time) {
-      // isKnockout is false for Group Stage (match 2 is a Group match)
       const p2 = this.getMatchProgress(match2Time, now, 2, 1, false);
       if (p2.status !== 'scheduled') {
         knownScores[2] = p2;
@@ -497,32 +505,52 @@ class MatchService {
     }
 
     processedMatches.forEach(match => {
-      const matchId = parseInt(match.id, 10);
-      if (knownScores[matchId]) {
-        const ks = knownScores[matchId];
-        match.status = ks.status;
-        match.homeTeamGoals = ks.homeTeamGoals;
-        match.awayTeamGoals = ks.awayTeamGoals;
-        match.elapsedMinutes = ks.elapsedMinutes;
-        match.homeGoals90 = ks.homeGoals90;
-        match.awayGoals90 = ks.awayGoals90;
-        match.extraHomeGoals = ks.extraHomeGoals;
-        match.extraAwayGoals = ks.extraAwayGoals;
-        match.penHomeGoals = ks.penHomeGoals;
-        match.penAwayGoals = ks.penAwayGoals;
-      } else if (match.status === 'scheduled') {
-        const sim = this.calculateSimulatedMatchState(match, now);
-        if (sim.status !== 'scheduled') {
-          match.status = sim.status;
-          match.homeTeamGoals = sim.homeTeamGoals;
-          match.awayTeamGoals = sim.awayTeamGoals;
-          match.elapsedMinutes = sim.elapsedMinutes;
-          match.homeGoals90 = sim.homeGoals90;
-          match.awayGoals90 = sim.awayGoals90;
-          match.extraHomeGoals = sim.extraHomeGoals;
-          match.extraAwayGoals = sim.extraAwayGoals;
-          match.penHomeGoals = sim.penHomeGoals;
-          match.penAwayGoals = sim.penAwayGoals;
+      // Find if this match is available in the scraped Flashscore list
+      const scraped = scrapedMatches.find(s => 
+        this.matchTeamName(match.homeTeamName, s.homeName) && 
+        this.matchTeamName(match.awayTeamName, s.awayName)
+      );
+
+      if (scraped) {
+        console.log(`⚡ Syncing Match ${match.id} (${match.homeTeamName} vs ${match.awayTeamName}) with real-time Flashscore data: ${scraped.homeTeamGoals}-${scraped.awayTeamGoals} (${scraped.status})`);
+        match.status = scraped.status;
+        match.homeTeamGoals = scraped.homeTeamGoals;
+        match.awayTeamGoals = scraped.awayTeamGoals;
+        match.elapsedMinutes = scraped.elapsedMinutes;
+        match.homeGoals90 = scraped.homeGoals90;
+        match.awayGoals90 = scraped.awayGoals90;
+        match.extraHomeGoals = scraped.extraHomeGoals;
+        match.extraAwayGoals = scraped.extraAwayGoals;
+        match.penHomeGoals = scraped.penHomeGoals;
+        match.penAwayGoals = scraped.penAwayGoals;
+      } else {
+        const matchId = parseInt(match.id, 10);
+        if (knownScores[matchId]) {
+          const ks = knownScores[matchId];
+          match.status = ks.status;
+          match.homeTeamGoals = ks.homeTeamGoals;
+          match.awayTeamGoals = ks.awayTeamGoals;
+          match.elapsedMinutes = ks.elapsedMinutes;
+          match.homeGoals90 = ks.homeGoals90;
+          match.awayGoals90 = ks.awayGoals90;
+          match.extraHomeGoals = ks.extraHomeGoals;
+          match.extraAwayGoals = ks.extraAwayGoals;
+          match.penHomeGoals = ks.penHomeGoals;
+          match.penAwayGoals = ks.penAwayGoals;
+        } else if (match.status === 'scheduled') {
+          const sim = this.calculateSimulatedMatchState(match, now);
+          if (sim.status !== 'scheduled') {
+            match.status = sim.status;
+            match.homeTeamGoals = sim.homeTeamGoals;
+            match.awayTeamGoals = sim.awayTeamGoals;
+            match.elapsedMinutes = sim.elapsedMinutes;
+            match.homeGoals90 = sim.homeGoals90;
+            match.awayGoals90 = sim.awayGoals90;
+            match.extraHomeGoals = sim.extraHomeGoals;
+            match.extraAwayGoals = sim.extraAwayGoals;
+            match.penHomeGoals = sim.penHomeGoals;
+            match.penAwayGoals = sim.penAwayGoals;
+          }
         }
       }
     });
@@ -885,6 +913,290 @@ class MatchService {
       penHomeGoals: '',
       penAwayGoals: ''
     };
+  }
+
+  removeVietnameseAccents(str) {
+    if (!str) return '';
+    return str.normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/đ/g, 'd')
+              .replace(/Đ/g, 'D')
+              .toLowerCase();
+  }
+
+  matchTeamName(dbName, flashName) {
+    const normDb = this.removeVietnameseAccents(dbName).trim();
+    const normFlash = this.removeVietnameseAccents(flashName).trim();
+    
+    if (normDb === normFlash) return true;
+    if (normDb.includes(normFlash) || normFlash.includes(normDb)) return true;
+    
+    // Check translation map
+    const TEAM_TRANSLATIONS = {
+      'Algeria': ['algeria', 'angieri'],
+      'Argentina': ['argentina'],
+      'Australia': ['uc', 'australia'],
+      'Austria': ['ao', 'austria'],
+      'Belgium': ['bi', 'belgium'],
+      'Bosnia-Herzegovina': ['bosnia'],
+      'Brazil': ['brazil'],
+      'Canada': ['canada'],
+      'Cape Verde': ['cape verde'],
+      'Colombia': ['colombia'],
+      'Croatia': ['croatia'],
+      'Curaçao': ['curacao'],
+      'Czechia': ['sec', 'czech'],
+      'DR Congo': ['congo'],
+      'Ecuador': ['ecuador'],
+      'Egypt': ['ai cap', 'egypt'],
+      'England': ['anh', 'england'],
+      'France': ['phap', 'france'],
+      'Germany': ['duc', 'germany'],
+      'Ghana': ['ghana'],
+      'Haiti': ['haiti'],
+      'Iran': ['iran'],
+      'Iraq': ['iraq'],
+      'Ivory Coast': ['bo bien nha', 'ivory coast'],
+      'Japan': ['nhat', 'japan'],
+      'Jordan': ['jordan'],
+      'Mexico': ['mexico'],
+      'Morocco': ['ma roc', 'morocco'],
+      'Netherlands': ['ha lan', 'netherlands'],
+      'New Zealand': ['new zealand'],
+      'Norway': ['na uy', 'norway'],
+      'Panama': ['panama'],
+      'Paraguay': ['paraguay'],
+      'Portugal': ['bo dao nha', 'portugal'],
+      'Qatar': ['qatar'],
+      'Saudi Arabia': ['a rap', 'saudi arabia'],
+      'Scotland': ['scotland'],
+      'Senegal': ['senegal'],
+      'South Africa': ['nam phi', 'south africa'],
+      'South Korea': ['han quoc', 'south korea', 'korea'],
+      'Spain': ['tay ban nha', 'spain'],
+      'Sweden': ['thuy dien', 'sweden'],
+      'Switzerland': ['thuy si', 'switzerland'],
+      'Tunisia': ['tunisia'],
+      'Türkiye': ['tho nhi ky', 'turkey'],
+      'USA': ['my', 'usa', 'hoa ky', 'united states'],
+      'Uruguay': ['uruguay'],
+      'Uzbekistan': ['uzbekistan']
+    };
+
+    if (TEAM_TRANSLATIONS[dbName]) {
+      return TEAM_TRANSLATIONS[dbName].some(val => normFlash.includes(val) || val.includes(normFlash));
+    }
+    return false;
+  }
+
+  async scrapeFlashscore(dbMatches = []) {
+    const puppeteer = require('puppeteer-core');
+    console.log('🌐 [Scraper] Launching headless Chrome for Flashscore sync...');
+    const browser = await puppeteer.launch({
+      executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    try {
+      const page = await browser.newPage();
+      
+      const scrapeUrl = async (url, sourcePage) => {
+        console.log(`🌐 [Scraper] Navigating to ${url}...`);
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+        await new Promise(r => setTimeout(r, 5000));
+        
+        let showMoreVisible = true;
+        let clicks = 0;
+        while (showMoreVisible && clicks < 10) {
+          const showMoreButton = await page.$('.event__more');
+          if (showMoreButton) {
+            console.log('🌐 [Scraper] Clicking ".event__more" button to load more matches...');
+            await showMoreButton.click();
+            await new Promise(r => setTimeout(r, 3000));
+            clicks++;
+          } else {
+            showMoreVisible = false;
+          }
+        }
+
+        return await page.evaluate((sourcePage) => {
+          const elements = document.querySelectorAll('.event__match');
+          const results = [];
+          elements.forEach(el => {
+            const homeParticipant = el.querySelector('.event__homeParticipant');
+            const homeName = homeParticipant ? (homeParticipant.querySelector('[class*="name"]') || homeParticipant.querySelector('span') || homeParticipant).innerText : '';
+            const awayParticipant = el.querySelector('.event__awayParticipant');
+            const awayName = awayParticipant ? (awayParticipant.querySelector('[class*="name"]') || awayParticipant.querySelector('span') || awayParticipant).innerText : '';
+            const homeScoreText = el.querySelector('.event__score--home')?.innerText || '';
+            const awayScoreText = el.querySelector('.event__score--away')?.innerText || '';
+            const stage = el.querySelector('.event__stage--block')?.innerText || el.querySelector('.event__time')?.innerText || '';
+            
+            const linkEl = el.querySelector('.eventRowLink');
+            const href = linkEl ? linkEl.href : '';
+            
+            const homeSup = el.querySelector('.event__score--home sup')?.innerText || '';
+            const awaySup = el.querySelector('.event__score--away sup')?.innerText || '';
+            
+            results.push({
+              homeName: homeName.trim(),
+              awayName: awayName.trim(),
+              homeScoreText: homeScoreText.trim(),
+              awayScoreText: awayScoreText.trim(),
+              homeSup: homeSup.trim(),
+              awaySup: awaySup.trim(),
+              stage: stage.trim(),
+              href,
+              sourcePage
+            });
+          });
+          return results;
+        }, sourcePage);
+      };
+
+      console.log('🌐 [Scraper] Scraping results...');
+      const resultsMatches = await scrapeUrl('https://www.flashscore.vn/bong-da/world/world-cup/ket-qua/', 'results');
+      console.log(`🌐 [Scraper] Found ${resultsMatches.length} matches in results.`);
+
+      console.log('🌐 [Scraper] Scraping fixtures...');
+      const fixturesMatches = await scrapeUrl('https://www.flashscore.vn/bong-da/world/world-cup/lich-thi-dau/', 'fixtures');
+      console.log(`🌐 [Scraper] Found ${fixturesMatches.length} matches in fixtures.`);
+
+      const matches = [...resultsMatches, ...fixturesMatches];
+      
+      const uniqueMatchesMap = new Map();
+      for (const m of matches) {
+        const key = `${m.homeName}-${m.awayName}`;
+        uniqueMatchesMap.set(key, m);
+      }
+      const uniqueMatches = Array.from(uniqueMatchesMap.values());
+      console.log(`🌐 [Scraper] Total unique matches after combining results and fixtures: ${uniqueMatches.length}`);
+
+      const parsedMatches = [];
+      for (const m of uniqueMatches) {
+        let homeScore = m.homeScoreText;
+        let awayScore = m.awayScoreText;
+        if (m.homeSup) homeScore = homeScore.replace(m.homeSup, '').trim();
+        if (m.awaySup) awayScore = awayScore.replace(m.awaySup, '').trim();
+        
+        let penHomeGoals = '';
+        let penAwayGoals = '';
+        if (m.homeSup) {
+          penHomeGoals = m.homeSup.replace(/[()]/g, '');
+        }
+        if (m.awaySup) {
+          penAwayGoals = m.awaySup.replace(/[()]/g, '');
+        }
+
+        const isLive = m.stage.includes('\'') || m.stage === 'HT' || m.stage === 'Hiệp phụ' || m.stage === 'Luân lưu' || m.stage.includes('Break') || m.stage.includes('ET');
+        const isCompleted = !isLive && (m.stage === 'Kết thúc' || m.stage.includes('KT') || m.stage.includes('Pen') || m.stage.includes('HP') || m.sourcePage === 'results');
+        
+        let status = 'scheduled';
+        if (isCompleted) status = 'completed';
+        else if (isLive) status = 'live';
+
+        let homeTeamGoals = homeScore !== '' && homeScore !== '-' ? parseInt(homeScore, 10) : '';
+        let awayTeamGoals = awayScore !== '' && awayScore !== '-' ? parseInt(awayScore, 10) : '';
+
+        let elapsedMinutes = '';
+        if (isLive) {
+          elapsedMinutes = m.stage;
+        }
+
+        let homeGoals90 = '';
+        let awayGoals90 = '';
+        let extraHomeGoals = '';
+        let extraAwayGoals = '';
+
+        if (status === 'completed' && homeTeamGoals !== '' && awayTeamGoals !== '') {
+          homeGoals90 = homeTeamGoals;
+          awayGoals90 = awayTeamGoals;
+          
+          const goesToET = m.stage.toUpperCase().includes('HP') || m.stage.toUpperCase().includes('PEN') || penHomeGoals !== '';
+          if (goesToET) {
+            extraHomeGoals = homeTeamGoals;
+            extraAwayGoals = awayTeamGoals;
+            
+            if (penHomeGoals !== '' && penAwayGoals !== '') {
+              const pHome = parseInt(penHomeGoals, 10);
+              const pAway = parseInt(penAwayGoals, 10);
+              if (pHome > pAway) {
+                homeTeamGoals = homeTeamGoals + 1;
+              } else {
+                awayTeamGoals = awayTeamGoals + 1;
+              }
+            }
+
+            const isRelevant = dbMatches.length === 0 || dbMatches.some(dbMatch => 
+              this.matchTeamName(dbMatch.homeTeamName, m.homeName) && 
+              this.matchTeamName(dbMatch.awayTeamName, m.awayName)
+            );
+
+            if (isRelevant && m.href) {
+              try {
+                console.log(`🌐 [Scraper] Fetching sub-scores for ET match: ${m.homeName} vs ${m.awayName}...`);
+                const detailPage = await browser.newPage();
+                await detailPage.goto(m.href, { waitUntil: 'networkidle2', timeout: 30000 });
+                await new Promise(r => setTimeout(r, 2000));
+                
+                const cells = await detailPage.evaluate(() => {
+                  const elList = document.querySelectorAll('[class*="period"], [class*="cell"]');
+                  return Array.from(elList).map(el => el.innerText.trim());
+                });
+                
+                let h1Score = '';
+                let h2Score = '';
+                for (let i = 0; i < cells.length; i++) {
+                  const txt = cells[i].toUpperCase();
+                  if (txt === 'HIỆP 1' || txt === '1ST HALF') {
+                    h1Score = cells[i+1] || '';
+                  } else if (txt === 'HIỆP 2' || txt === '2ND HALF') {
+                    h2Score = cells[i+1] || '';
+                  }
+                }
+                
+                if (h1Score && h2Score) {
+                  const [h1Home, h1Away] = h1Score.split('-').map(Number);
+                  const [h2Home, h2Away] = h2Score.split('-').map(Number);
+                  if (!isNaN(h1Home) && !isNaN(h2Home)) {
+                    homeGoals90 = h1Home + h2Home;
+                    awayGoals90 = h1Away + h2Away;
+                    console.log(`🌐 [Scraper] Parsed 90-min score for ${m.homeName}: ${homeGoals90}-${awayGoals90}`);
+                  }
+                }
+                await detailPage.close();
+              } catch (detailErr) {
+                console.warn(`⚠️ [Scraper] Failed to fetch match details for ET: ${detailErr.message}`);
+              }
+            }
+          }
+        }
+
+        parsedMatches.push({
+          homeName: m.homeName,
+          awayName: m.awayName,
+          homeTeamGoals,
+          awayTeamGoals,
+          elapsedMinutes,
+          status,
+          homeGoals90,
+          awayGoals90,
+          extraHomeGoals,
+          extraAwayGoals,
+          penHomeGoals: penHomeGoals ? parseInt(penHomeGoals, 10) : '',
+          penAwayGoals: penAwayGoals ? parseInt(penAwayGoals, 10) : ''
+        });
+      }
+
+      await browser.close();
+      return parsedMatches;
+    } catch (err) {
+      console.error('❌ [Scraper] Error scraping Flashscore:', err);
+      try {
+        await browser.close();
+      } catch {}
+      return [];
+    }
   }
 }
 
