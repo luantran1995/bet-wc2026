@@ -733,11 +733,14 @@ export class App implements OnInit, OnDestroy {
   getMatchStatusLabel(bet: Bet): string {
     const match = this.getMatchForBet(bet);
     if (!match) return '';
+    const details = this.formatMatchScoreDetails(match);
+    const suffix = details ? ` ${details}` : '';
     if (match.status === 'live') {
-      return ` (LIVE: ${match.homeTeamGoals} - ${match.awayTeamGoals})`;
+      const elapsed = match.elapsedMinutes ? ` - ${this.formatElapsedMinutes(match.elapsedMinutes)}` : '';
+      return ` (LIVE: ${match.homeTeamGoals} - ${match.awayTeamGoals}${elapsed})`;
     }
     if (match.status === 'completed') {
-      return ` (FT: ${match.homeTeamGoals} - ${match.awayTeamGoals})`;
+      return ` (FT: ${match.homeTeamGoals} - ${match.awayTeamGoals}${suffix})`;
     }
     return '';
   }
@@ -825,5 +828,43 @@ export class App implements OnInit, OnDestroy {
         }, 400);
       }
     }, 4000);
+  }
+
+  formatElapsedMinutes(elapsed: any): string {
+    if (elapsed === undefined || elapsed === null || elapsed === '') return '';
+    const str = elapsed.toString();
+    if (str === 'HT') {
+      return this.tService.currentLang() === 'vi' ? 'Nghỉ giữa hiệp' : 'HT';
+    }
+    if (str === 'PEN') {
+      return this.tService.currentLang() === 'vi' ? 'Luân lưu' : 'PEN';
+    }
+    if (str === 'ET Break') {
+      return this.tService.currentLang() === 'vi' ? 'Nghỉ HP' : 'ET Break';
+    }
+    if (str === 'ET HT') {
+      return this.tService.currentLang() === 'vi' ? 'Nghỉ giữa HP' : 'ET HT';
+    }
+    if (str.includes('+') || !isNaN(Number(str))) {
+      return `${str}'`;
+    }
+    return str;
+  }
+
+  formatMatchScoreDetails(match: Match): string {
+    if (!match) return '';
+    
+    // Check if it went to penalties
+    const hasPen = match.penHomeGoals !== undefined && match.penHomeGoals !== null && match.penHomeGoals !== '';
+    // Check if it went to extra time
+    const hasET = match.extraHomeGoals !== undefined && match.extraHomeGoals !== null && match.extraHomeGoals !== '';
+    
+    if (hasPen) {
+      return `(90': ${match.homeGoals90}-${match.awayGoals90}, ET: ${match.extraHomeGoals}-${match.extraAwayGoals}, PEN: ${match.penHomeGoals}-${match.penAwayGoals})`;
+    }
+    if (hasET) {
+      return `(90': ${match.homeGoals90}-${match.awayGoals90}, ET: ${match.extraHomeGoals}-${match.extraAwayGoals})`;
+    }
+    return '';
   }
 }

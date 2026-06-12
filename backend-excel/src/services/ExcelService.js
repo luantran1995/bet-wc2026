@@ -19,7 +19,8 @@ class ExcelService {
       'matchId', 'matchName', 'betType', 'stake', 'status', 'payout',
       'groupKey', 'round', 'time', 'homeTeamName', 'homeTeamFlag',
       'awayTeamName', 'awayTeamFlag', 'homeTeamGoals', 'awayTeamGoals',
-      'elapsedMinutes', 'stadium'
+      'elapsedMinutes', 'stadium', 'homeGoals90', 'awayGoals90',
+      'extraHomeGoals', 'extraAwayGoals', 'penHomeGoals', 'penAwayGoals'
     ];
   }
 

@@ -279,6 +279,9 @@ class MatchService {
 
     const stadium = f.venue ? f.venue.name : 'Unknown Stadium';
 
+    const homeGoals90 = (status === 'scheduled') ? '' : homeTeamGoals;
+    const awayGoals90 = (status === 'scheduled') ? '' : awayTeamGoals;
+
     return {
       id: parseInt(f.id, 10),
       groupKey,
@@ -292,7 +295,13 @@ class MatchService {
       homeTeamGoals,
       awayTeamGoals,
       elapsedMinutes,
-      stadium
+      stadium,
+      homeGoals90,
+      awayGoals90,
+      extraHomeGoals: '',
+      extraAwayGoals: '',
+      penHomeGoals: '',
+      penAwayGoals: ''
     };
   }
 
@@ -305,7 +314,18 @@ class MatchService {
     matches.forEach(m => {
       m.homeTeamGoals  = m.homeTeamGoals  !== '' ? Number(m.homeTeamGoals)  : null;
       m.awayTeamGoals  = m.awayTeamGoals  !== '' ? Number(m.awayTeamGoals)  : null;
-      m.elapsedMinutes = m.elapsedMinutes !== '' ? Number(m.elapsedMinutes) : null;
+      if (m.elapsedMinutes !== undefined && m.elapsedMinutes !== '') {
+        const num = Number(m.elapsedMinutes);
+        m.elapsedMinutes = isNaN(num) ? m.elapsedMinutes : num;
+      } else {
+        m.elapsedMinutes = null;
+      }
+      m.homeGoals90 = (m.homeGoals90 !== undefined && m.homeGoals90 !== '') ? Number(m.homeGoals90) : null;
+      m.awayGoals90 = (m.awayGoals90 !== undefined && m.awayGoals90 !== '') ? Number(m.awayGoals90) : null;
+      m.extraHomeGoals = (m.extraHomeGoals !== undefined && m.extraHomeGoals !== '') ? Number(m.extraHomeGoals) : null;
+      m.extraAwayGoals = (m.extraAwayGoals !== undefined && m.extraAwayGoals !== '') ? Number(m.extraAwayGoals) : null;
+      m.penHomeGoals = (m.penHomeGoals !== undefined && m.penHomeGoals !== '') ? Number(m.penHomeGoals) : null;
+      m.penAwayGoals = (m.penAwayGoals !== undefined && m.penAwayGoals !== '') ? Number(m.penAwayGoals) : null;
     });
     return matches;
   }
@@ -418,7 +438,14 @@ class MatchService {
 
         const homeTeamGoals = (status === 'scheduled') ? '' : parseInt(m.home_score, 10);
         const awayTeamGoals = (status === 'scheduled') ? '' : parseInt(m.away_score, 10);
-        const elapsedMinutes = (status === 'live') ? (parseInt(m.time_elapsed, 10) || 0) : '';
+        
+        let elapsedMinutes = '';
+        if (status === 'live') {
+          elapsedMinutes = m.time_elapsed || '';
+        }
+
+        const homeGoals90 = (status === 'scheduled') ? '' : homeTeamGoals;
+        const awayGoals90 = (status === 'scheduled') ? '' : awayTeamGoals;
 
         return {
           id: parseInt(m.id, 10),
@@ -433,7 +460,13 @@ class MatchService {
           homeTeamGoals,
           awayTeamGoals,
           elapsedMinutes,
-          stadium: stadium ? stadium.name_en : 'Unknown Stadium'
+          stadium: stadium ? stadium.name_en : 'Unknown Stadium',
+          homeGoals90,
+          awayGoals90,
+          extraHomeGoals: '',
+          extraAwayGoals: '',
+          penHomeGoals: '',
+          penAwayGoals: ''
         };
       });
     }
@@ -449,30 +482,20 @@ class MatchService {
     const knownScores = {};
 
     if (match1Time) {
-      const diff1 = now.getTime() - match1Time.getTime();
-      if (diff1 >= 0) {
-        const isCompleted = diff1 >= 110 * 60 * 1000;
-        knownScores[1] = {
-          status: isCompleted ? 'completed' : 'live',
-          homeTeamGoals: 2,
-          awayTeamGoals: 0,
-          elapsedMinutes: isCompleted ? '' : Math.min(90, Math.floor(diff1 / (60 * 1000)))
-        };
+      const p1 = this.getMatchProgress(match1Time, now, 2, 0, false);
+      if (p1.status !== 'scheduled') {
+        knownScores[1] = p1;
       }
     }
 
     if (match2Time) {
-      const diff2 = now.getTime() - match2Time.getTime();
-      if (diff2 >= 0) {
-        const isCompleted = diff2 >= 110 * 60 * 1000;
-        knownScores[2] = {
-          status: isCompleted ? 'completed' : 'live',
-          homeTeamGoals: 2,
-          awayTeamGoals: 1,
-          elapsedMinutes: isCompleted ? '' : Math.min(90, Math.floor(diff2 / (60 * 1000)))
-        };
+      // isKnockout is false for Group Stage (match 2 is a Group match)
+      const p2 = this.getMatchProgress(match2Time, now, 2, 1, false);
+      if (p2.status !== 'scheduled') {
+        knownScores[2] = p2;
       }
     }
+
     processedMatches.forEach(match => {
       const matchId = parseInt(match.id, 10);
       if (knownScores[matchId]) {
@@ -481,6 +504,12 @@ class MatchService {
         match.homeTeamGoals = ks.homeTeamGoals;
         match.awayTeamGoals = ks.awayTeamGoals;
         match.elapsedMinutes = ks.elapsedMinutes;
+        match.homeGoals90 = ks.homeGoals90;
+        match.awayGoals90 = ks.awayGoals90;
+        match.extraHomeGoals = ks.extraHomeGoals;
+        match.extraAwayGoals = ks.extraAwayGoals;
+        match.penHomeGoals = ks.penHomeGoals;
+        match.penAwayGoals = ks.penAwayGoals;
       } else if (match.status === 'scheduled') {
         const sim = this.calculateSimulatedMatchState(match, now);
         if (sim.status !== 'scheduled') {
@@ -488,6 +517,12 @@ class MatchService {
           match.homeTeamGoals = sim.homeTeamGoals;
           match.awayTeamGoals = sim.awayTeamGoals;
           match.elapsedMinutes = sim.elapsedMinutes;
+          match.homeGoals90 = sim.homeGoals90;
+          match.awayGoals90 = sim.awayGoals90;
+          match.extraHomeGoals = sim.extraHomeGoals;
+          match.extraAwayGoals = sim.extraAwayGoals;
+          match.penHomeGoals = sim.penHomeGoals;
+          match.penAwayGoals = sim.penAwayGoals;
         }
       }
     });
@@ -517,6 +552,19 @@ class MatchService {
             newMatch.homeTeamGoals = oldMatch.homeTeamGoals;
             newMatch.awayTeamGoals = oldMatch.awayTeamGoals;
             newMatch.elapsedMinutes = oldMatch.elapsedMinutes;
+            
+            const isCompleted = oldMatch.status === 'completed';
+            newMatch.homeGoals90 = (oldMatch.homeGoals90 !== undefined && oldMatch.homeGoals90 !== '') 
+              ? oldMatch.homeGoals90 
+              : (isCompleted ? oldMatch.homeTeamGoals : '');
+            newMatch.awayGoals90 = (oldMatch.awayGoals90 !== undefined && oldMatch.awayGoals90 !== '') 
+              ? oldMatch.awayGoals90 
+              : (isCompleted ? oldMatch.awayTeamGoals : '');
+              
+            newMatch.extraHomeGoals = (oldMatch.extraHomeGoals !== undefined && oldMatch.extraHomeGoals !== '') ? oldMatch.extraHomeGoals : '';
+            newMatch.extraAwayGoals = (oldMatch.extraAwayGoals !== undefined && oldMatch.extraAwayGoals !== '') ? oldMatch.extraAwayGoals : '';
+            newMatch.penHomeGoals = (oldMatch.penHomeGoals !== undefined && oldMatch.penHomeGoals !== '') ? oldMatch.penHomeGoals : '';
+            newMatch.penAwayGoals = (oldMatch.penAwayGoals !== undefined && oldMatch.penAwayGoals !== '') ? oldMatch.penAwayGoals : '';
           }
         }
       }
@@ -550,42 +598,12 @@ class MatchService {
       };
     }
 
-    const diffMs = now.getTime() - matchDate.getTime();
+    const seed = parseInt(match.id, 10);
+    const baseHome = (seed * 17 + 5) % 4; // 0 to 3
+    const baseAway = (seed * 11 + 3) % 3; // 0 to 2
+    const isKnockout = match.groupKey === 'knockout' || match.groupKey === 'final';
 
-    if (diffMs < 0) {
-      return {
-        status: 'scheduled',
-        homeTeamGoals: '',
-        awayTeamGoals: '',
-        elapsedMinutes: ''
-      };
-    } else if (diffMs < 2 * 60 * 60 * 1000) {
-      const elapsedMinutes = Math.min(90, Math.floor(diffMs / (60 * 1000)));
-      const seed = parseInt(match.id, 10);
-      const finalHome = (seed * 17 + 5) % 4;
-      const finalAway = (seed * 11 + 3) % 3;
-      const progress = elapsedMinutes / 90;
-      const homeTeamGoals = Math.min(finalHome, Math.floor(finalHome * progress));
-      const awayTeamGoals = Math.min(finalAway, Math.floor(finalAway * progress));
-
-      return {
-        status: 'live',
-        homeTeamGoals,
-        awayTeamGoals,
-        elapsedMinutes
-      };
-    } else {
-      const seed = parseInt(match.id, 10);
-      const homeTeamGoals = (seed * 17 + 5) % 4;
-      const awayTeamGoals = (seed * 11 + 3) % 3;
-
-      return {
-        status: 'completed',
-        homeTeamGoals,
-        awayTeamGoals,
-        elapsedMinutes: ''
-      };
-    }
+    return this.getMatchProgress(matchDate, now, baseHome, baseAway, isKnockout);
   }
 
   /**
@@ -598,6 +616,275 @@ class MatchService {
     const [_, y, m, d, h, min] = parts.map(Number);
     const utcDate = new Date(Date.UTC(y, m - 1, d, h - 7, min));
     return utcDate;
+  }
+
+  /**
+   * Helper to determine full match progress (including injury time and extra time).
+   */
+  getMatchProgress(matchTime, now, finalHomeGoals, finalAwayGoals, isKnockout = false) {
+    const diffMs = now.getTime() - matchTime.getTime();
+    if (diffMs < 0) {
+      return {
+        status: 'scheduled',
+        homeTeamGoals: '',
+        awayTeamGoals: '',
+        elapsedMinutes: '',
+        homeGoals90: '',
+        awayGoals90: '',
+        extraHomeGoals: '',
+        extraAwayGoals: '',
+        penHomeGoals: '',
+        penAwayGoals: ''
+      };
+    }
+
+    const diffMin = Math.floor(diffMs / (60 * 1000));
+    const isDrawAt90 = finalHomeGoals === finalAwayGoals;
+    const hasExtraTime = isKnockout && isDrawAt90;
+
+    // 1. First Half (0 - 45 mins)
+    if (diffMin < 45) {
+      const progress = diffMin / 90;
+      const homeTeamGoals = Math.min(finalHomeGoals, Math.floor(finalHomeGoals * progress));
+      const awayTeamGoals = Math.min(finalAwayGoals, Math.floor(finalAwayGoals * progress));
+      return {
+        status: 'live',
+        homeTeamGoals,
+        awayTeamGoals,
+        elapsedMinutes: diffMin + 1,
+        homeGoals90: '',
+        awayGoals90: '',
+        extraHomeGoals: '',
+        extraAwayGoals: '',
+        penHomeGoals: '',
+        penAwayGoals: ''
+      };
+    }
+
+    // 2. First Half Injury Time (45 - 48 mins)
+    if (diffMin < 48) {
+      const progress = 45 / 90;
+      const homeTeamGoals = Math.min(finalHomeGoals, Math.floor(finalHomeGoals * progress));
+      const awayTeamGoals = Math.min(finalAwayGoals, Math.floor(finalAwayGoals * progress));
+      return {
+        status: 'live',
+        homeTeamGoals,
+        awayTeamGoals,
+        elapsedMinutes: `45+${diffMin - 45 + 1}`,
+        homeGoals90: '',
+        awayGoals90: '',
+        extraHomeGoals: '',
+        extraAwayGoals: '',
+        penHomeGoals: '',
+        penAwayGoals: ''
+      };
+    }
+
+    // 3. Halftime Break (48 - 63 mins)
+    if (diffMin < 63) {
+      const progress = 45 / 90;
+      const homeTeamGoals = Math.min(finalHomeGoals, Math.floor(finalHomeGoals * progress));
+      const awayTeamGoals = Math.min(finalAwayGoals, Math.floor(finalAwayGoals * progress));
+      return {
+        status: 'live',
+        homeTeamGoals,
+        awayTeamGoals,
+        elapsedMinutes: 'HT',
+        homeGoals90: '',
+        awayGoals90: '',
+        extraHomeGoals: '',
+        extraAwayGoals: '',
+        penHomeGoals: '',
+        penAwayGoals: ''
+      };
+    }
+
+    // 4. Second Half (63 - 108 mins)
+    if (diffMin < 108) {
+      const progress = (45 + (diffMin - 63)) / 90;
+      const homeTeamGoals = Math.min(finalHomeGoals, Math.floor(finalHomeGoals * progress));
+      const awayTeamGoals = Math.min(finalAwayGoals, Math.floor(finalAwayGoals * progress));
+      return {
+        status: 'live',
+        homeTeamGoals,
+        awayTeamGoals,
+        elapsedMinutes: 46 + (diffMin - 63),
+        homeGoals90: '',
+        awayGoals90: '',
+        extraHomeGoals: '',
+        extraAwayGoals: '',
+        penHomeGoals: '',
+        penAwayGoals: ''
+      };
+    }
+
+    // 5. Second Half Injury Time (108 - 113 mins)
+    if (diffMin < 113) {
+      return {
+        status: 'live',
+        homeTeamGoals: finalHomeGoals,
+        awayTeamGoals: finalAwayGoals,
+        elapsedMinutes: `90+${diffMin - 108 + 1}`,
+        homeGoals90: '',
+        awayGoals90: '',
+        extraHomeGoals: '',
+        extraAwayGoals: '',
+        penHomeGoals: '',
+        penAwayGoals: ''
+      };
+    }
+
+    // 6. Extra Time / Penalties (Knockout Draw)
+    if (hasExtraTime) {
+      const seed = 7;
+      const etHomeExtra = (seed * 5) % 2;
+      const etAwayExtra = (seed * 3) % 2;
+      const etHomeTotal = finalHomeGoals + etHomeExtra;
+      const etAwayTotal = finalAwayGoals + etAwayExtra;
+
+      if (diffMin < 118) {
+        return {
+          status: 'live',
+          homeTeamGoals: finalHomeGoals,
+          awayTeamGoals: finalAwayGoals,
+          elapsedMinutes: 'ET Break',
+          homeGoals90: finalHomeGoals,
+          awayGoals90: finalAwayGoals,
+          extraHomeGoals: '',
+          extraAwayGoals: '',
+          penHomeGoals: '',
+          penAwayGoals: ''
+        };
+      }
+      if (diffMin < 133) {
+        const progress = (diffMin - 118) / 30;
+        const homeGoalsCurrent = finalHomeGoals + Math.min(etHomeExtra, Math.floor(etHomeExtra * progress));
+        const awayGoalsCurrent = finalAwayGoals + Math.min(etAwayExtra, Math.floor(etAwayExtra * progress));
+        return {
+          status: 'live',
+          homeTeamGoals: homeGoalsCurrent,
+          awayTeamGoals: awayGoalsCurrent,
+          elapsedMinutes: 91 + (diffMin - 118),
+          homeGoals90: finalHomeGoals,
+          awayGoals90: finalAwayGoals,
+          extraHomeGoals: homeGoalsCurrent,
+          extraAwayGoals: awayGoalsCurrent,
+          penHomeGoals: '',
+          penAwayGoals: ''
+        };
+      }
+      if (diffMin < 135) {
+        const progress = 15 / 30;
+        const homeGoalsCurrent = finalHomeGoals + Math.min(etHomeExtra, Math.floor(etHomeExtra * progress));
+        const awayGoalsCurrent = finalAwayGoals + Math.min(etAwayExtra, Math.floor(etAwayExtra * progress));
+        return {
+          status: 'live',
+          homeTeamGoals: homeGoalsCurrent,
+          awayTeamGoals: awayGoalsCurrent,
+          elapsedMinutes: `105+${diffMin - 133 + 1}`,
+          homeGoals90: finalHomeGoals,
+          awayGoals90: finalAwayGoals,
+          extraHomeGoals: homeGoalsCurrent,
+          extraAwayGoals: awayGoalsCurrent,
+          penHomeGoals: '',
+          penAwayGoals: ''
+        };
+      }
+      if (diffMin < 137) {
+        const progress = 15 / 30;
+        const homeGoalsCurrent = finalHomeGoals + Math.min(etHomeExtra, Math.floor(etHomeExtra * progress));
+        const awayGoalsCurrent = finalAwayGoals + Math.min(etAwayExtra, Math.floor(etAwayExtra * progress));
+        return {
+          status: 'live',
+          homeTeamGoals: homeGoalsCurrent,
+          awayTeamGoals: awayGoalsCurrent,
+          elapsedMinutes: 'ET HT',
+          homeGoals90: finalHomeGoals,
+          awayGoals90: finalAwayGoals,
+          extraHomeGoals: homeGoalsCurrent,
+          extraAwayGoals: awayGoalsCurrent,
+          penHomeGoals: '',
+          penAwayGoals: ''
+        };
+      }
+      if (diffMin < 152) {
+        const progress = (15 + (diffMin - 137)) / 30;
+        const homeGoalsCurrent = finalHomeGoals + Math.min(etHomeExtra, Math.floor(etHomeExtra * progress));
+        const awayGoalsCurrent = finalAwayGoals + Math.min(etAwayExtra, Math.floor(etAwayExtra * progress));
+        return {
+          status: 'live',
+          homeTeamGoals: homeGoalsCurrent,
+          awayTeamGoals: awayGoalsCurrent,
+          elapsedMinutes: 106 + (diffMin - 137),
+          homeGoals90: finalHomeGoals,
+          awayGoals90: finalAwayGoals,
+          extraHomeGoals: homeGoalsCurrent,
+          extraAwayGoals: awayGoalsCurrent,
+          penHomeGoals: '',
+          penAwayGoals: ''
+        };
+      }
+      if (diffMin < 154) {
+        return {
+          status: 'live',
+          homeTeamGoals: etHomeTotal,
+          awayTeamGoals: etAwayTotal,
+          elapsedMinutes: `120+${diffMin - 152 + 1}`,
+          homeGoals90: finalHomeGoals,
+          awayGoals90: finalAwayGoals,
+          extraHomeGoals: etHomeTotal,
+          extraAwayGoals: etAwayTotal,
+          penHomeGoals: '',
+          penAwayGoals: ''
+        };
+      }
+      if (diffMin < 170) {
+        const progress = (diffMin - 154) / 16;
+        const penHomeGoals = Math.min(5, Math.floor(5 * progress));
+        const penAwayGoals = Math.min(4, Math.floor(4 * progress));
+        return {
+          status: 'live',
+          homeTeamGoals: etHomeTotal,
+          awayTeamGoals: etAwayTotal,
+          elapsedMinutes: 'PEN',
+          homeGoals90: finalHomeGoals,
+          awayGoals90: finalAwayGoals,
+          extraHomeGoals: etHomeTotal,
+          extraAwayGoals: etAwayTotal,
+          penHomeGoals: penHomeGoals,
+          penAwayGoals: penAwayGoals
+        };
+      }
+      const penHomeWinner = (seed * 7) % 2 === 0;
+      const finalETHome = etHomeTotal + (penHomeWinner ? 1 : 0);
+      const finalETAway = etAwayTotal + (penHomeWinner ? 0 : 1);
+      return {
+        status: 'completed',
+        homeTeamGoals: finalETHome,
+        awayTeamGoals: finalETAway,
+        elapsedMinutes: '',
+        homeGoals90: finalHomeGoals,
+        awayGoals90: finalAwayGoals,
+        extraHomeGoals: etHomeTotal,
+        extraAwayGoals: etAwayTotal,
+        penHomeGoals: penHomeWinner ? 5 : 4,
+        penAwayGoals: penHomeWinner ? 4 : 5
+      };
+    }
+
+    // 7. Completed Normal Match
+    return {
+      status: 'completed',
+      homeTeamGoals: finalHomeGoals,
+      awayTeamGoals: finalAwayGoals,
+      elapsedMinutes: '',
+      homeGoals90: finalHomeGoals,
+      awayGoals90: finalAwayGoals,
+      extraHomeGoals: '',
+      extraAwayGoals: '',
+      penHomeGoals: '',
+      penAwayGoals: ''
+    };
   }
 }
 

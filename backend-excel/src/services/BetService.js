@@ -148,21 +148,19 @@ class BetService {
    */
   autoSettleBetsForMatch(match) {
     const bets = this.excelService.readSheet(this.betsFile, 'bets');
-    const homeGoals = parseInt(match.homeTeamGoals, 10);
-    const awayGoals = parseInt(match.awayTeamGoals, 10);
+    
+    // Settle based on the 90-minute score (regular time + injury time) if available, otherwise fall back to final score.
+    const hasGoals90 = match.homeGoals90 !== undefined && match.homeGoals90 !== '' && match.homeGoals90 !== null &&
+                       match.awayGoals90 !== undefined && match.awayGoals90 !== '' && match.awayGoals90 !== null;
+                       
+    const homeGoals = hasGoals90 ? parseInt(match.homeGoals90, 10) : parseInt(match.homeTeamGoals, 10);
+    const awayGoals = hasGoals90 ? parseInt(match.awayGoals90, 10) : parseInt(match.awayTeamGoals, 10);
     
     if (isNaN(homeGoals) || isNaN(awayGoals)) return;
     
     let outcome = 'draw';
     if (homeGoals > awayGoals) outcome = 'homeWin';
     else if (awayGoals > homeGoals) outcome = 'awayWin';
-    
-    // Guard: if it's a knockout match, it cannot end in a draw. 
-    // If the score is a draw, wait for manual settlement or shootout update.
-    if ((match.groupKey === 'knockout' || match.groupKey === 'final') && outcome === 'draw') {
-      console.warn(`⚠️ Match ${match.id} (${match.homeTeamName} vs ${match.awayTeamName}) is a knockout draw. Skipping auto-settlement.`);
-      return;
-    }
     
     let updated = false;
     bets.forEach(bet => {
@@ -177,7 +175,7 @@ class BetService {
         bet.status = isWon ? 'won' : 'lost';
         bet.payout = bet.status === 'won' ? 0 : -Number(bet.stake || 10000);
         updated = true;
-        console.log(`💰 Automatically settled bet ${bet.id} for ${bet.name} as [${bet.status}]`);
+        console.log(`💰 Automatically settled bet ${bet.id} for ${bet.name} as [${bet.status}] based on 90-min score: ${homeGoals}-${awayGoals}`);
       }
     });
     

@@ -14,7 +14,13 @@ export interface Match {
   homeTeamGoals?: number;
   awayTeamGoals?: number;
   status?: string;
-  elapsedMinutes?: number;
+  elapsedMinutes?: any;
+  homeGoals90?: any;
+  awayGoals90?: any;
+  extraHomeGoals?: any;
+  extraAwayGoals?: any;
+  penHomeGoals?: any;
+  penAwayGoals?: any;
 }
 
 export interface Bet {
