@@ -585,60 +585,16 @@ class MatchService extends EventEmitter {
     if (normDb === normFlash) return true;
     if (normDb.includes(normFlash) || normFlash.includes(normDb)) return true;
     
-    // Check translation map
-    const TEAM_TRANSLATIONS = {
-      'Algeria': ['algeria', 'angieri'],
-      'Argentina': ['argentina'],
-      'Australia': ['uc', 'australia'],
-      'Austria': ['ao', 'austria'],
-      'Belgium': ['bi', 'belgium'],
-      'Bosnia-Herzegovina': ['bosnia'],
-      'Brazil': ['brazil'],
-      'Canada': ['canada'],
-      'Cape Verde': ['cape verde'],
-      'Colombia': ['colombia'],
-      'Croatia': ['croatia'],
-      'Curaçao': ['curacao'],
-      'Czechia': ['sec', 'czech'],
-      'DR Congo': ['congo'],
-      'Ecuador': ['ecuador'],
-      'Egypt': ['ai cap', 'egypt'],
-      'England': ['anh', 'england'],
-      'France': ['phap', 'france'],
-      'Germany': ['duc', 'germany'],
-      'Ghana': ['ghana'],
-      'Haiti': ['haiti'],
-      'Iran': ['iran'],
-      'Iraq': ['iraq'],
-      'Ivory Coast': ['bo bien nha', 'ivory coast'],
-      'Japan': ['nhat', 'japan'],
-      'Jordan': ['jordan'],
-      'Mexico': ['mexico'],
-      'Morocco': ['ma roc', 'morocco'],
-      'Netherlands': ['ha lan', 'netherlands'],
-      'New Zealand': ['new zealand'],
-      'Norway': ['na uy', 'norway'],
-      'Panama': ['panama'],
-      'Paraguay': ['paraguay'],
-      'Portugal': ['bo dao nha', 'portugal'],
-      'Qatar': ['qatar'],
-      'Saudi Arabia': ['a rap', 'saudi arabia'],
-      'Scotland': ['scotland'],
-      'Senegal': ['senegal'],
-      'South Africa': ['nam phi', 'south africa'],
-      'South Korea': ['han quoc', 'south korea', 'korea'],
-      'Spain': ['tay ban nha', 'spain'],
-      'Sweden': ['thuy dien', 'sweden'],
-      'Switzerland': ['thuy si', 'switzerland'],
-      'Tunisia': ['tunisia'],
-      'Türkiye': ['tho nhi ky', 'turkey'],
-      'USA': ['my', 'usa', 'hoa ky', 'united states'],
-      'Uruguay': ['uruguay'],
-      'Uzbekistan': ['uzbekistan']
-    };
+    // Check translation map (loaded dynamically from config to avoid hardcoding)
+    let teamTranslations = {};
+    try {
+      teamTranslations = require('../config/team-translations.json');
+    } catch (err) {
+      console.warn('⚠️ Failed to load team translations config:', err.message);
+    }
 
-    if (TEAM_TRANSLATIONS[dbName]) {
-      return TEAM_TRANSLATIONS[dbName].some(val => normFlash.includes(val) || val.includes(normFlash));
+    if (teamTranslations[dbName]) {
+      return teamTranslations[dbName].some(val => normFlash.includes(val) || val.includes(normFlash));
     }
     return false;
   }
