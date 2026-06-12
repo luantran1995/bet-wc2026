@@ -75,10 +75,42 @@ class FlashscoreScraper extends ScraperStrategy {
     try {
       const page = await browser.newPage();
       
+      // Enable Request Interception to block third-party trackers, ads, images, fonts, and media
+      await page.setRequestInterception(true);
+      page.on('request', (request) => {
+        const type = request.resourceType();
+        const url = request.url();
+        if (
+          ['image', 'font', 'media'].includes(type) ||
+          url.includes('google-analytics') ||
+          url.includes('doubleclick') ||
+          url.includes('googlesyndication') ||
+          url.includes('facebook') ||
+          url.includes('scorecardresearch') ||
+          url.includes('adnxs') ||
+          url.includes('adsystem') ||
+          url.includes('adservice') ||
+          url.includes('quantserve') ||
+          url.includes('amazon-adsystem')
+        ) {
+          request.abort();
+        } else {
+          request.continue();
+        }
+      });
+      
       const scrapeUrl = async (url, sourcePage) => {
         console.log(`🌐 [Scraper] Navigating to ${url}...`);
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-        await new Promise(r => setTimeout(r, 5000));
+        // Use 'domcontentloaded' to avoid getting stuck on trailing network calls and detachment errors
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        
+        // Wait for match selector to be present
+        try {
+          await page.waitForSelector('.event__match', { timeout: 20000 });
+        } catch (e) {
+          console.warn(`⚠️ [Scraper] Timeout waiting for .event__match on ${url}`);
+        }
+        await new Promise(r => setTimeout(r, 2000));
         
         let showMoreVisible = true;
         let clicks = 0;
@@ -210,8 +242,38 @@ class FlashscoreScraper extends ScraperStrategy {
               try {
                 console.log(`🌐 [Scraper] Fetching sub-scores for ET match: ${m.homeName} vs ${m.awayName}...`);
                 const detailPage = await browser.newPage();
-                await detailPage.goto(m.href, { waitUntil: 'networkidle2', timeout: 30000 });
-                await new Promise(r => setTimeout(r, 2000));
+                
+                // Enable request interception for detail page too
+                await detailPage.setRequestInterception(true);
+                detailPage.on('request', (request) => {
+                  const type = request.resourceType();
+                  const url = request.url();
+                  if (
+                    ['image', 'font', 'media'].includes(type) ||
+                    url.includes('google-analytics') ||
+                    url.includes('doubleclick') ||
+                    url.includes('googlesyndication') ||
+                    url.includes('facebook') ||
+                    url.includes('scorecardresearch') ||
+                    url.includes('adnxs') ||
+                    url.includes('adsystem') ||
+                    url.includes('adservice') ||
+                    url.includes('quantserve') ||
+                    url.includes('amazon-adsystem')
+                  ) {
+                    request.abort();
+                  } else {
+                    request.continue();
+                  }
+                });
+
+                await detailPage.goto(m.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                try {
+                  await detailPage.waitForSelector('[class*="period"]', { timeout: 15000 });
+                } catch (e) {
+                  console.warn(`⚠️ [Scraper] Timeout waiting for [class*="period"] on ${m.href}`);
+                }
+                await new Promise(r => setTimeout(r, 1000));
                 
                 const cells = await detailPage.evaluate(() => {
                   const elList = document.querySelectorAll('[class*="period"], [class*="cell"]');
