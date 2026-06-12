@@ -26,7 +26,7 @@ export class TranslationService {
 
   async loadTranslations(lang: Language) {
     try {
-      const response = await fetch(`/i18n/${lang}.json`);
+      const response = await fetch(`i18n/${lang}.json`);
       if (!response.ok) {
         throw new Error(`Failed to load translation file: ${response.statusText}`);
       }
