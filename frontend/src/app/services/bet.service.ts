@@ -58,6 +58,10 @@ export class BetService {
     return this.http.post<any>(`${this.apiUrl}/matches/sync`, {});
   }
 
+  getSyncStatus(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/sync-status`);
+  }
+
   getMatches(): Observable<Match[]> {
     return this.http.get<Match[]>(`${this.apiUrl}/matches`);
   }

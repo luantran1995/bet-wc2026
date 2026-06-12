@@ -9,9 +9,11 @@ const MatchService = require('./src/services/MatchService');
  */
 class DataInitializer {
   constructor() {
-    this.dataDir = path.join(__dirname, 'data');
+    this.dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
     this.excelService = new ExcelService(this.dataDir);
-    this.matchService = new MatchService(this.excelService, path.join(this.dataDir, 'matches.xlsx'));
+    
+    const matchesName = process.env.MATCHES_FILE_NAME || 'matches.xlsx';
+    this.matchService = new MatchService(this.excelService, path.join(this.dataDir, matchesName));
   }
 
   /**
@@ -52,14 +54,17 @@ class DataInitializer {
       }
     ];
 
-    this.excelService.writeSheet(path.join(this.dataDir, 'accounts.xlsx'), 'accounts', accounts);
+    const accountsName = process.env.ACCOUNTS_FILE_NAME || 'accounts.xlsx';
+    const betsName = process.env.BETS_FILE_NAME || 'bets.xlsx';
+
+    this.excelService.writeSheet(path.join(this.dataDir, accountsName), 'accounts', accounts);
     console.log('✅ Accounts spreadsheet initialized.');
 
     // ─── 2. SEED MATCHES (Fetched dynamically from API via MatchService) ────
     await this.matchService.syncMatchesFromApi();
 
     // ─── 3. SEED BETS (Empty initially) ─────────────────────────────────────
-    this.excelService.writeSheet(path.join(this.dataDir, 'bets.xlsx'), 'bets', []);
+    this.excelService.writeSheet(path.join(this.dataDir, betsName), 'bets', []);
 
     // ─── 4. COPY TO INITIAL-DATA FOR GIT / RAILWAY VOLUMES ───────────────────
     const initialDataDir = path.join(__dirname, 'initial-data');
@@ -67,16 +72,23 @@ class DataInitializer {
       fs.mkdirSync(initialDataDir, { recursive: true });
     }
 
-    const filesToCopy = ['accounts.xlsx', 'bets.xlsx', 'matches.xlsx'];
-    filesToCopy.forEach(fileName => {
-      const srcPath = path.join(this.dataDir, fileName);
-      const destPath = path.join(initialDataDir, fileName);
+    const matchesName = process.env.MATCHES_FILE_NAME || 'matches.xlsx';
+
+    const filesToCopy = [
+      { name: accountsName, fallback: 'accounts.xlsx' },
+      { name: betsName, fallback: 'bets.xlsx' },
+      { name: matchesName, fallback: 'matches.xlsx' }
+    ];
+    
+    filesToCopy.forEach(file => {
+      const srcPath = path.join(this.dataDir, file.name);
+      const destPath = path.join(initialDataDir, file.fallback);
       if (fs.existsSync(srcPath)) {
         try {
           fs.copyFileSync(srcPath, destPath);
-          console.log(`📦 Synced seed database to template: ${fileName}`);
+          console.log(`📦 Synced seed database to template: ${file.name}`);
         } catch (err) {
-          console.error(`❌ Failed to sync seed template ${fileName}:`, err.message);
+          console.error(`❌ Failed to sync seed template ${file.name}:`, err.message);
         }
       }
     });

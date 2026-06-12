@@ -17,21 +17,27 @@ class WcBetServer {
     this.app = express();
     this.port = process.env.PORT || 3000;
 
-    // Resolve paths
-    this.dataDir = path.join(__dirname, 'data');
-    this.accountsFile = path.join(this.dataDir, 'accounts.xlsx');
-    this.betsFile = path.join(this.dataDir, 'bets.xlsx');
-    this.matchesFile = path.join(this.dataDir, 'matches.xlsx');
+    // Resolve paths from environment variables to avoid hardcoding
+    this.dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
+    
+    const accountsName = process.env.ACCOUNTS_FILE_NAME || 'accounts.xlsx';
+    const betsName = process.env.BETS_FILE_NAME || 'bets.xlsx';
+    const matchesName = process.env.MATCHES_FILE_NAME || 'matches.xlsx';
+
+    this.accountsFile = path.join(this.dataDir, accountsName);
+    this.betsFile = path.join(this.dataDir, betsName);
+    this.matchesFile = path.join(this.dataDir, matchesName);
 
     // Instantiate Services
     this.excelService = new ExcelService(this.dataDir);
     this.authService = new AuthService(this.excelService, this.accountsFile);
     this.betService = new BetService(this.excelService, this.betsFile, this.matchesFile);
-    this.matchService = new MatchService(this.excelService, this.matchesFile, this.betService);
+    this.matchService = new MatchService(this.excelService, this.matchesFile);
 
-    // Resolve circular dependency reference
-    this.betService.matchService = this.matchService;
-    this.matchService.betService = this.betService;
+    // Observer Design Pattern: Settle bets automatically when a match is completed
+    this.matchService.on('matchCompleted', (match) => {
+      this.betService.autoSettleBetsForMatch(match);
+    });
   }
 
   /**
@@ -89,12 +95,21 @@ class WcBetServer {
       }
     });
 
+    this.app.get('/api/sync-status', (req, res, next) => {
+      try {
+        res.json(this.matchService.lastSyncStatus || { success: true, timestamp: new Date().toISOString() });
+      } catch (err) {
+        next(err);
+      }
+    });
+
     this.app.post('/api/matches/sync', async (req, res, next) => {
       try {
         console.log('🔄 Manual matches sync triggered via API endpoint...');
         await this.matchService.syncMatchesFromApi();
         const matches = this.matchService.getMatches();
-        res.json({ message: 'Sync complete', matches });
+        const status = this.matchService.lastSyncStatus || { success: true };
+        res.json({ message: 'Sync complete', matches, syncStatus: status });
       } catch (err) {
         res.status(500).json({ error: 'Failed to sync matches from API: ' + err.message });
       }
@@ -233,40 +248,26 @@ class WcBetServer {
    * Configures scheduling routines for syncing WC matches.
    */
   setupSchedules() {
-    // On startup: Sync matches from FIFA API if not updated in the last 24 hours
+    // On startup: Always sync matches from Flashscore VN
     (async () => {
       try {
-        let shouldSync = true;
-        if (fs.existsSync(this.matchesFile)) {
-          const stats = fs.statSync(this.matchesFile);
-          const now = new Date();
-          const diffMs = now.getTime() - stats.mtime.getTime();
-          const twentyFourHoursMs = 24 * 60 * 60 * 1000;
-          if (diffMs < twentyFourHoursMs) {
-            shouldSync = false;
-            const lastUpdatedHours = (diffMs / (60 * 60 * 1000)).toFixed(1);
-            console.log(`🌐 Matches database was updated ${lastUpdatedHours} hours ago (less than 24h). Skipping startup sync.`);
-          }
-        }
-        
-        if (shouldSync) {
-          console.log('🌐 Syncing WC 2026 matches from FIFA API on startup...');
-          await this.matchService.syncMatchesFromApi();
-        }
+        console.log('🌐 Syncing WC 2026 matches from Flashscore VN on startup...');
+        await this.matchService.syncMatchesFromApi();
       } catch (err) {
         console.warn('⚠️ Startup sync failed (using local cache if available):', err.message);
       }
     })();
 
-    // Auto-sync matches from FIFA API every 24 hours
+    // Auto-sync matches from Flashscore VN every 2 minutes for real-time updates
+    const SYNC_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
     setInterval(async () => {
       try {
-        console.log('🔄 Auto-syncing matches from FIFA API (daily schedule)...');
+        console.log('🔄 Auto-syncing matches from Flashscore VN (real-time schedule)...');
         await this.matchService.syncMatchesFromApi();
       } catch (err) {
         console.error('❌ Auto-sync failed:', err.message);
       }
-    }, 24 * 60 * 60 * 1000);
+    }, SYNC_INTERVAL_MS);
   }
 
   /**
@@ -283,25 +284,33 @@ class WcBetServer {
       fs.mkdirSync(this.dataDir, { recursive: true });
     }
 
-    const filesToCopy = ['accounts.xlsx', 'bets.xlsx', 'matches.xlsx'];
+    const accountsName = process.env.ACCOUNTS_FILE_NAME || 'accounts.xlsx';
+    const betsName = process.env.BETS_FILE_NAME || 'bets.xlsx';
+    const matchesName = process.env.MATCHES_FILE_NAME || 'matches.xlsx';
+
+    const filesToCopy = [
+      { name: accountsName, fallback: 'accounts.xlsx' },
+      { name: betsName, fallback: 'bets.xlsx' },
+      { name: matchesName, fallback: 'matches.xlsx' }
+    ];
     
-    filesToCopy.forEach(fileName => {
-      const destPath = path.join(this.dataDir, fileName);
-      const srcPath = path.join(initialDataDir, fileName);
+    filesToCopy.forEach(file => {
+      const destPath = path.join(this.dataDir, file.name);
+      const srcPath = path.join(initialDataDir, file.fallback);
       
       if (!fs.existsSync(destPath)) {
         if (fs.existsSync(srcPath)) {
-          console.log(`📦 Copying initial database template: ${fileName} -> ${this.dataDir}`);
+          console.log(`📦 Copying initial database template: ${file.name} -> ${this.dataDir}`);
           try {
             fs.copyFileSync(srcPath, destPath);
           } catch (err) {
-            console.error(`❌ Failed to copy initial ${fileName}:`, err.message);
+            console.error(`❌ Failed to copy initial ${file.name}:`, err.message);
           }
         } else {
-          console.warn(`⚠️ Initial file ${fileName} not found in template directory: ${initialDataDir}`);
+          console.warn(`⚠️ Initial file template ${file.fallback} not found in: ${initialDataDir}`);
         }
       } else {
-        console.log(`✅ Database file already exists: ${fileName}`);
+        console.log(`✅ Database file already exists: ${file.name}`);
       }
     });
   }

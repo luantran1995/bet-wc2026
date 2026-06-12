@@ -76,6 +76,26 @@ export class App implements OnInit, OnDestroy {
   toasts: Toast[] = [];
   private toastCounter = 0;
 
+  // Flashscore Connection Error Status
+  showFlashscoreConnectionError: boolean = false;
+
+  checkSyncStatus() {
+    this.betService.getSyncStatus().subscribe({
+      next: (status) => {
+        this.showFlashscoreConnectionError = !status.success;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.warn('[App] Error checking sync status:', err);
+      }
+    });
+  }
+
+  dismissFlashscoreError() {
+    this.showFlashscoreConnectionError = false;
+    this.cdr.detectChanges();
+  }
+
   // Background rotation state
   backgrounds: string[] = [
     'statue_of_liberty.png',
@@ -103,6 +123,7 @@ export class App implements OnInit, OnDestroy {
     }
 
     this.loadMatches();
+    this.checkSyncStatus();
     this.loadBets();
 
     // Background rotation timer (cycles every 8 seconds)
@@ -145,13 +166,24 @@ export class App implements OnInit, OnDestroy {
       next: (res: any) => {
         this.isSyncing = false;
         this.matches = res.matches || [];
-        this.showToast('Đồng bộ tỉ số thời gian thực từ FIFA API thành công!', 'success');
+        
+        // Update connection status alert based on syncStatus returned
+        if (res.syncStatus) {
+          this.showFlashscoreConnectionError = !res.syncStatus.success;
+        }
+        
+        if (this.showFlashscoreConnectionError) {
+          this.showToast('Đồng bộ tỉ số hoàn thành (giả lập), lỗi kết nối với Flashscore VN!', 'warning');
+        } else {
+          this.showToast('Đồng bộ tỉ số thời gian thực từ Flashscore VN thành công!', 'success');
+        }
         this.cdr.detectChanges();
       },
       error: (err) => {
         this.isSyncing = false;
         const errMsg = err.error?.error || err.message || 'Lỗi không xác định';
         this.showToast('Lỗi khi đồng bộ tỉ số: ' + errMsg, 'danger');
+        this.checkSyncStatus();
         this.cdr.detectChanges();
       }
     });

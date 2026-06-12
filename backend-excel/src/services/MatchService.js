@@ -1,309 +1,27 @@
-const https = require('https');
 const fs = require('fs');
+const path = require('path');
+
+
+const EventEmitter = require('events');
 
 /**
  * Service to manage match schedules, API synchronization and status updates.
+ * Implements Observer Design Pattern (extends EventEmitter).
  */
-class MatchService {
+class MatchService extends EventEmitter {
   /**
    * @param {ExcelService} excelService - The Excel service instance.
    * @param {string} matchesFile - Path to the matches Excel file.
-   * @param {BetService} [betService] - The Bet service instance to auto-settle bets.
    */
-  constructor(excelService, matchesFile, betService = null) {
+  constructor(excelService, matchesFile) {
+    super();
     this.excelService = excelService;
     this.matchesFile = matchesFile;
-    this.betService = betService;
-    
-    // FIFA API endpoint URLs (Live API with SSL ignore)
-    this.matchesUrl = 'https://worldcup26.ir/get/games';
-    this.teamsUrl = 'https://worldcup26.ir/get/teams';
-    this.stadiumsUrl = 'https://worldcup26.ir/get/stadiums';
-
-    // Sportmonks configuration
-    this.sportmonksConfig = {
-      enabled: process.env.USE_SPORTMONKS !== 'false',
-      token: process.env.SPORTMONKS_TOKEN || 'YiP9bZ1dY3Y7XI6YG25DgQ573I8HxWxSXqE2yrg4jv2Xd0Tp8yF5SiTWv8OE',
-      leagueId: parseInt(process.env.SPORTMONKS_LEAGUE_ID || '796', 10)
-    };
-
-    // Mapping city offsets for WC 2026 Host Cities
-    this.cityOffsets = {
-      'Mexico City': -6, 'Guadalajara': -6, 'Monterrey': -6, 'Toronto': -4,
-      'Boston': -4, 'Houston': -5, 'Kansas City': -5, 'Miami': -4,
-      'New York': -4, 'New Jersey': -4, 'Philadelphia': -4, 'San Francisco': -7,
-      'Seattle': -7, 'Vancouver': -7, 'Atlanta': -4, 'Dallas': -5, 'Los Angeles': -7
-    };
-
-    // Mapping for UK nations special flag emojis
-    this.specialFlags = {
-      'ENG': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
-      'SCO': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
-      'WAL': '🏴󠁧󠁢󠁷󠁬󠁳󠁿'
-    };
+    this.lastSyncStatus = { success: true, timestamp: new Date().toISOString() };
   }
 
-  /**
-   * Set BetService dependency after instantiation (resolves circular references).
-   * @param {BetService} betService 
-   */
-  setBetService(betService) {
-    this.betService = betService;
-  }
 
-  /**
-   * Helper to perform HTTP GET requests returning JSON.
-   */
-  fetchJson(url) {
-    return new Promise((resolve, reject) => {
-      const parsedUrl = new URL(url);
-      const agent = new https.Agent({ rejectUnauthorized: false });
-      const options = {
-        hostname: parsedUrl.hostname,
-        path: parsedUrl.pathname + parsedUrl.search,
-        agent: agent,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-        }
-      };
-      https.get(options, (res) => {
-        let body = '';
-        res.on('data', chunk => body += chunk);
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(body));
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }).on('error', reject);
-    });
-  }
 
-  /**
-   * Helper to perform HTTP GET requests with custom headers returning JSON.
-   */
-  fetchJsonWithHeader(url, headers = {}) {
-    return new Promise((resolve, reject) => {
-      const parsedUrl = new URL(url);
-      const agent = new https.Agent({ rejectUnauthorized: false });
-      const options = {
-        hostname: parsedUrl.hostname,
-        path: parsedUrl.pathname + parsedUrl.search,
-        agent: agent,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          ...headers
-        }
-      };
-      https.get(options, (res) => {
-        let body = '';
-        res.on('data', chunk => body += chunk);
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(body);
-            if (res.statusCode >= 400 || (json && json.message && json.message.includes('subscription'))) {
-              reject(new Error(json.message || `HTTP ${res.statusCode}`));
-            } else {
-              resolve(json);
-            }
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }).on('error', reject);
-    });
-  }
-
-  /**
-   * Recursive method to fetch all fixtures from Sportmonks pagination.
-   */
-  async fetchAllSportmonksFixtures(leagueId, token) {
-    let fixtures = [];
-    let url = `https://api.sportmonks.com/v3/football/fixtures?filters=fixtureLeagues:${leagueId}&include=participants.country;scores;state;stage;group;round;venue`;
-    
-    while (url) {
-      const response = await this.fetchJsonWithHeader(url, { 'Authorization': token });
-      if (response && response.data) {
-        fixtures = fixtures.concat(response.data);
-      }
-      if (response && response.pagination && response.pagination.has_more && response.pagination.next_page) {
-        url = response.pagination.next_page;
-      } else {
-        url = null;
-      }
-    }
-    return fixtures;
-  }
-
-  /**
-   * Normalizes UTC Date Strings to Vietnam Time Format (YYYY-MM-DD HH:mm).
-   */
-  convertUtcToVnTime(utcDateStr) {
-    const d = new Date(utcDateStr + ' UTC');
-    if (isNaN(d.getTime())) return utcDateStr;
-    
-    const vnDate = new Date(d.getTime() + (7 * 60 * 60 * 1000));
-    const y = vnDate.getUTCFullYear();
-    const m = String(vnDate.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(vnDate.getUTCDate()).padStart(2, '0');
-    const h = String(vnDate.getUTCHours()).padStart(2, '0');
-    const min = String(vnDate.getUTCMinutes()).padStart(2, '0');
-    return `${y}-${m}-${day} ${h}:${min}`;
-  }
-
-  /**
-   * Converts local timezone based local_date to VN time using city offset.
-   */
-  convertToVietnamTime(localDateStr, city) {
-    const offset = this.getOffsetForCity(city);
-    if (offset === null) return localDateStr;
-    
-    const parts = localDateStr.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);
-    if (!parts) return localDateStr;
-    
-    const month = parseInt(parts[1], 10) - 1;
-    const day = parseInt(parts[2], 10);
-    const year = parseInt(parts[3], 10);
-    const hour = parseInt(parts[4], 10);
-    const minute = parseInt(parts[5], 10);
-    
-    const utcDate = new Date(Date.UTC(year, month, day, hour - offset, minute));
-    const vnDate = new Date(utcDate.getTime() + (7 * 60 * 60 * 1000));
-    
-    const vnYear = vnDate.getUTCFullYear();
-    const vnMonth = String(vnDate.getUTCMonth() + 1).padStart(2, '0');
-    const vnDay = String(vnDate.getUTCDate()).padStart(2, '0');
-    const vnHour = String(vnDate.getUTCHours()).padStart(2, '0');
-    const vnMin = String(vnDate.getUTCMinutes()).padStart(2, '0');
-    
-    return `${vnYear}-${vnMonth}-${vnDay} ${vnHour}:${vnMin}`;
-  }
-
-  /**
-   * Normalizes match state to 'scheduled', 'live', or 'completed'.
-   */
-  getMatchStatus(stateShortName) {
-    const short = (stateShortName || '').toUpperCase();
-    if (['NS', 'TBD', 'POSTP', 'CANCL', 'SUSP'].includes(short)) return 'scheduled';
-    if (['FT', 'AET', 'FT_PEN', 'AWARDED'].includes(short)) return 'completed';
-    return 'live';
-  }
-
-  /**
-   * Converts group name/stage name to user-friendly Vietnamese terminology.
-   */
-  getVietnameseRound(stageName, roundName, groupName) {
-    if (groupName) {
-      const letter = groupName.replace(/group/i, '').trim();
-      return `Bảng ${letter.toUpperCase()}`;
-    }
-    const name = (stageName || roundName || '').toLowerCase();
-    if (name.includes('32')) return 'Vòng 1/32';
-    if (name.includes('16')) return 'Vòng 1/16';
-    if (name.includes('quarter') || name.includes('qf')) return 'Tứ Kết';
-    if (name.includes('semi') || name.includes('sf')) return 'Bán Kết';
-    if (name.includes('third') || name.includes('3rd') || name.includes('place')) return 'Tranh Hạng Ba';
-    if (name.includes('final')) return 'Chung Kết';
-    return stageName || roundName || '';
-  }
-
-  getOffsetForCity(city) {
-    for (const [key, offset] of Object.entries(this.cityOffsets)) {
-      if (city.includes(key)) {
-        return offset;
-      }
-    }
-    return null;
-  }
-
-  getFlagEmoji(team) {
-    if (this.specialFlags[team.iso2]) return this.specialFlags[team.iso2];
-    if (team.iso2 && team.iso2.length === 2) {
-      const codePoints = team.iso2
-        .toUpperCase()
-        .split('')
-        .map(char => 127397 + char.charCodeAt(0));
-      return String.fromCodePoint(...codePoints);
-    }
-    return '🏳️';
-  }
-
-  normalizeTeamName(name) {
-    if (name === 'United States') return 'USA';
-    if (name === 'Czech Republic') return 'Czechia';
-    if (name === 'Bosnia and Herzegovina') return 'Bosnia-Herzegovina';
-    if (name === 'Turkey') return 'Türkiye';
-    if (name === 'Democratic Republic of the Congo') return 'DR Congo';
-    return name;
-  }
-
-  mapSportmonksFixtureToMatch(f) {
-    const homePart = f.participants.find(p => p.meta && p.meta.location === 'home');
-    const awayPart = f.participants.find(p => p.meta && p.meta.location === 'away');
-
-    const homeTeamName = homePart ? this.normalizeTeamName(homePart.name) : 'TBD';
-    const homeTeamFlag = (homePart && homePart.country) ? this.getFlagEmoji(homePart.country) : '🏳️';
-    
-    const awayTeamName = awayPart ? this.normalizeTeamName(awayPart.name) : 'TBD';
-    const awayTeamFlag = (awayPart && awayPart.country) ? this.getFlagEmoji(awayPart.country) : '🏳️';
-
-    const groupName = f.group ? f.group.name : null;
-    const stageName = f.stage ? f.stage.name : null;
-    const roundName = f.round ? f.round.name : null;
-    
-    const round = this.getVietnameseRound(stageName, roundName, groupName);
-
-    let groupKey = 'knockout';
-    if (groupName) {
-      const letter = groupName.replace(/group/i, '').trim().toUpperCase();
-      groupKey = `Group${letter}`;
-    } else if (stageName && stageName.toLowerCase().includes('final') && !stageName.toLowerCase().includes('semi') && !stageName.toLowerCase().includes('quarter')) {
-      groupKey = 'final';
-    }
-
-    const time = this.convertUtcToVnTime(f.starting_at);
-    const status = this.getMatchStatus(f.state ? f.state.short_name : 'NS');
-
-    const homeScoreObj = f.scores.find(s => s.type_id === 1525 && s.score && s.score.participant === 'home');
-    const awayScoreObj = f.scores.find(s => s.type_id === 1525 && s.score && s.score.participant === 'away');
-    
-    const homeTeamGoals = (status === 'scheduled') ? '' : (homeScoreObj ? parseInt(homeScoreObj.score.goals, 10) : 0);
-    const awayTeamGoals = (status === 'scheduled') ? '' : (awayScoreObj ? parseInt(awayScoreObj.score.goals, 10) : 0);
-
-    let elapsedMinutes = '';
-    if (status === 'live') {
-      const matchMin = f.state && f.state.name ? f.state.name.match(/\d+/) : null;
-      elapsedMinutes = matchMin ? parseInt(matchMin[0], 10) : 45;
-    }
-
-    const stadium = f.venue ? f.venue.name : 'Unknown Stadium';
-
-    const homeGoals90 = (status === 'scheduled') ? '' : homeTeamGoals;
-    const awayGoals90 = (status === 'scheduled') ? '' : awayTeamGoals;
-
-    return {
-      id: parseInt(f.id, 10),
-      groupKey,
-      round,
-      time,
-      homeTeamName,
-      homeTeamFlag,
-      awayTeamName,
-      awayTeamFlag,
-      status,
-      homeTeamGoals,
-      awayTeamGoals,
-      elapsedMinutes,
-      stadium,
-      homeGoals90,
-      awayGoals90,
-      extraHomeGoals: '',
-      extraAwayGoals: '',
-      penHomeGoals: '',
-      penAwayGoals: ''
-    };
-  }
 
   /**
    * Retrieves matches and parses their scores / progress integers properly.
@@ -343,12 +61,10 @@ class MatchService {
     const oldMatch = { ...matches[idx] };
     Object.assign(matches[idx], updateData);
     
-    // Auto settle bets if status was transitioned to completed
+    // Auto settle bets if status was transitioned to completed (Observer Pattern)
     if (matches[idx].status === 'completed' && oldMatch.status !== 'completed') {
       console.log(`🏆 Match ${id} manually completed: ${matches[idx].homeTeamName} ${matches[idx].homeTeamGoals}-${matches[idx].awayTeamGoals} ${matches[idx].awayTeamName}`);
-      if (this.betService) {
-        this.betService.autoSettleBetsForMatch(matches[idx]);
-      }
+      this.emit('matchCompleted', matches[idx]);
     }
 
     this.excelService.writeSheet(this.matchesFile, 'matches', matches);
@@ -360,148 +76,88 @@ class MatchService {
    * Automatically schedules bet auto-settlement for newly completed matches.
    */
   async syncMatchesFromApi() {
+    console.log('🔄 Syncing match data exclusively from Flashscore VN...');
     let processedMatches = [];
-    let success = false;
-
-    if (this.sportmonksConfig.enabled && this.sportmonksConfig.token) {
+    
+    // Load existing matches from local matches.xlsx
+    if (fs.existsSync(this.matchesFile)) {
       try {
-        console.log(`🔄 Syncing World Cup matches from Sportmonks API (League ID: ${this.sportmonksConfig.leagueId})...`);
-        const fixtures = await this.fetchAllSportmonksFixtures(this.sportmonksConfig.leagueId, this.sportmonksConfig.token);
-        processedMatches = fixtures.map(f => this.mapSportmonksFixtureToMatch(f));
-        success = true;
-        console.log(`✅ Successfully synced matches from Sportmonks API.`);
+        processedMatches = this.excelService.readSheet(this.matchesFile, 'matches') || [];
       } catch (err) {
-        console.warn(`⚠️ Sportmonks API sync failed: ${err.message}. Falling back to GitHub FIFA data source...`);
+        console.warn(`⚠️ Failed to read ${this.matchesFile}: ${err.message}`);
       }
     }
 
-    if (!success) {
-      console.log('🌐 Fetching official 2026 World Cup data from FIFA API (Live worldcup26.ir API)...');
-      const [rawMatchesRes, rawTeamsRes, rawStadiumsRes] = await Promise.all([
-        this.fetchJson(this.matchesUrl),
-        this.fetchJson(this.teamsUrl),
-        this.fetchJson(this.stadiumsUrl)
-      ]);
-
-      const rawMatches = rawMatchesRes.games || [];
-      const rawTeams = rawTeamsRes.teams || [];
-      const rawStadiums = rawStadiumsRes.stadiums || [];
-
-      const teamMap = {};
-      rawTeams.forEach(t => teamMap[t.id] = t);
-
-      const stadiumMap = {};
-      rawStadiums.forEach(s => stadiumMap[s.id] = s);
-
-      processedMatches = rawMatches.map(m => {
-        const isGroup = m.type === 'group';
-        let groupKey = 'knockout';
-        if (isGroup) {
-          groupKey = `Group${m.group.toUpperCase()}`;
-        } else if (m.type.toLowerCase() === 'final') {
-          groupKey = 'final';
+    // Fallback to seeding template if local matches file is missing or empty
+    if (processedMatches.length === 0) {
+      const templatePath = path.join(__dirname, '..', '..', 'initial-data', 'matches.xlsx');
+      if (fs.existsSync(templatePath)) {
+        try {
+          processedMatches = this.excelService.readSheet(templatePath, 'matches') || [];
+          console.log(`📦 Loaded ${processedMatches.length} baseline matches from template.`);
+        } catch (err) {
+          console.error(`❌ Failed to read seed template matches file: ${err.message}`);
         }
-        
-        let round = '';
-        if (isGroup) {
-          round = `Bảng ${m.group.toUpperCase()}`;
-        } else {
-          const type = m.type.toLowerCase();
-          if (type === 'r32') round = 'Vòng 1/32';
-          else if (type === 'r16') round = 'Vòng 1/16';
-          else if (type === 'qf') round = 'Tứ Kết';
-          else if (type === 'sf') round = 'Bán Kết';
-          else if (type === 'third') round = 'Tranh Hạng Ba';
-          else if (type === 'final') round = 'Chung Kết';
-          else round = m.type;
-        }
-
-        const homeTeam = teamMap[m.home_team_id];
-        const awayTeam = teamMap[m.away_team_id];
-
-        const homeTeamName = homeTeam ? this.normalizeTeamName(homeTeam.name_en) : 'TBD';
-        const homeTeamFlag = homeTeam ? this.getFlagEmoji(homeTeam) : '🏳️';
-        
-        const awayTeamName = awayTeam ? this.normalizeTeamName(awayTeam.name_en) : 'TBD';
-        const awayTeamFlag = awayTeam ? this.getFlagEmoji(awayTeam) : '🏳️';
-
-        const stadium = stadiumMap[m.stadium_id];
-        const city = stadium ? stadium.city_en : 'Unknown';
-        const time = this.convertToVietnamTime(m.local_date, city);
-
-        let status = 'scheduled';
-        if (m.finished === 'TRUE') {
-          status = 'completed';
-        } else if (m.time_elapsed && m.time_elapsed !== 'notstarted') {
-          status = 'live';
-        }
-
-        const homeTeamGoals = (status === 'scheduled') ? '' : parseInt(m.home_score, 10);
-        const awayTeamGoals = (status === 'scheduled') ? '' : parseInt(m.away_score, 10);
-        
-        let elapsedMinutes = '';
-        if (status === 'live') {
-          elapsedMinutes = m.time_elapsed || '';
-        }
-
-        const homeGoals90 = (status === 'scheduled') ? '' : homeTeamGoals;
-        const awayGoals90 = (status === 'scheduled') ? '' : awayTeamGoals;
-
-        return {
-          id: parseInt(m.id, 10),
-          groupKey,
-          round,
-          time,
-          homeTeamName,
-          homeTeamFlag,
-          awayTeamName,
-          awayTeamFlag,
-          status,
-          homeTeamGoals,
-          awayTeamGoals,
-          elapsedMinutes,
-          stadium: stadium ? stadium.name_en : 'Unknown Stadium',
-          homeGoals90,
-          awayGoals90,
-          extraHomeGoals: '',
-          extraAwayGoals: '',
-          penHomeGoals: '',
-          penAwayGoals: ''
-        };
-      });
+      }
     }
 
-    const existingMatches = fs.existsSync(this.matchesFile) ? this.excelService.readSheet(this.matchesFile, 'matches') : [];
+    if (processedMatches.length === 0) {
+      console.error('❌ No baseline matches could be loaded. Sync aborted.');
+      return [];
+    }
 
+    const existingMatches = JSON.parse(JSON.stringify(processedMatches));
     const now = new Date();
 
     // 1. Scrape real-time results from Flashscore.vn
+    // 1. Scrape real-time results from Flashscore.vn using Scraper Factory & Strategy Pattern
     let scrapedMatches = [];
     try {
-      console.log('🌐 Scraping real-time match data from Flashscore.vn...');
-      scrapedMatches = await this.scrapeFlashscore(processedMatches);
-      console.log(`✅ Scraped ${scrapedMatches.length} matches from Flashscore.vn.`);
+      const ScraperFactory = require('./scrapers/ScraperFactory');
+      const scraper = ScraperFactory.createScraper('flashscore');
+      scrapedMatches = await scraper.scrape(processedMatches, this.matchTeamName.bind(this));
+      console.log(`✅ Scraped ${scrapedMatches.length} matches from Flashscore VN.`);
+      this.lastSyncStatus = { success: true, timestamp: new Date().toISOString() };
     } catch (scrapeErr) {
       console.warn(`⚠️ Flashscore scraper failed: ${scrapeErr.message}. Falling back to simulation...`);
+      this.lastSyncStatus = {
+        success: false,
+        error: scrapeErr.message,
+        timestamp: new Date().toISOString()
+      };
     }
 
-    // 2. Known/Correct results from Flashscore.vn to override or correct API lag (as secondary fallback)
-    const match1Time = this.parseVnTimeToDate('2026-06-12 02:00');
-    const match2Time = this.parseVnTimeToDate('2026-06-12 09:00');
+    // 2. Known/Correct results to override or correct API lag (as secondary fallback)
     const knownScores = {};
-
-    if (match1Time) {
-      const p1 = this.getMatchProgress(match1Time, now, 2, 0, false);
-      if (p1.status !== 'scheduled') {
-        knownScores[1] = p1;
+    if (process.env.KNOWN_SCORES) {
+      try {
+        const parsedKnown = JSON.parse(process.env.KNOWN_SCORES);
+        parsedKnown.forEach(ks => {
+          const matchTime = this.parseVnTimeToDate(ks.time);
+          if (matchTime) {
+            const progress = this.getMatchProgress(matchTime, now, ks.homeGoals, ks.awayGoals, ks.isKnockout || false);
+            if (progress.status !== 'scheduled') {
+              knownScores[ks.id] = progress;
+            }
+          }
+        });
+      } catch (err) {
+        console.warn('⚠️ Failed to parse KNOWN_SCORES env var:', err.message);
       }
-    }
-
-    if (match2Time) {
-      const p2 = this.getMatchProgress(match2Time, now, 2, 1, false);
-      if (p2.status !== 'scheduled') {
-        knownScores[2] = p2;
-      }
+    } else {
+      const defaultKnown = [
+        { id: 1, time: '2026-06-12 02:00', homeGoals: 2, awayGoals: 0 },
+        { id: 2, time: '2026-06-12 09:00', homeGoals: 2, awayGoals: 1 }
+      ];
+      defaultKnown.forEach(ks => {
+        const matchTime = this.parseVnTimeToDate(ks.time);
+        if (matchTime) {
+          const progress = this.getMatchProgress(matchTime, now, ks.homeGoals, ks.awayGoals, false);
+          if (progress.status !== 'scheduled') {
+            knownScores[ks.id] = progress;
+          }
+        }
+      });
     }
 
     processedMatches.forEach(match => {
@@ -597,13 +253,11 @@ class MatchService {
         }
       }
 
-      // Auto settle bets if status was transitioned to completed
+      // Auto settle bets if status was transitioned to completed (Observer Pattern)
       const oldStatus = oldMatch ? oldMatch.status : 'scheduled';
       if (newMatch.status === 'completed' && oldStatus !== 'completed') {
         console.log(`🏆 Match ${newMatch.id} completed: ${newMatch.homeTeamName} ${newMatch.homeTeamGoals}-${newMatch.awayTeamGoals} ${newMatch.awayTeamName}`);
-        if (this.betService) {
-          this.betService.autoSettleBetsForMatch(newMatch);
-        }
+        this.emit('matchCompleted', newMatch);
       }
     });
 
@@ -987,216 +641,6 @@ class MatchService {
       return TEAM_TRANSLATIONS[dbName].some(val => normFlash.includes(val) || val.includes(normFlash));
     }
     return false;
-  }
-
-  async scrapeFlashscore(dbMatches = []) {
-    const puppeteer = require('puppeteer-core');
-    console.log('🌐 [Scraper] Launching headless Chrome for Flashscore sync...');
-    const browser = await puppeteer.launch({
-      executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-
-    try {
-      const page = await browser.newPage();
-      
-      const scrapeUrl = async (url, sourcePage) => {
-        console.log(`🌐 [Scraper] Navigating to ${url}...`);
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-        await new Promise(r => setTimeout(r, 5000));
-        
-        let showMoreVisible = true;
-        let clicks = 0;
-        while (showMoreVisible && clicks < 10) {
-          const showMoreButton = await page.$('.event__more');
-          if (showMoreButton) {
-            console.log('🌐 [Scraper] Clicking ".event__more" button to load more matches...');
-            await showMoreButton.click();
-            await new Promise(r => setTimeout(r, 3000));
-            clicks++;
-          } else {
-            showMoreVisible = false;
-          }
-        }
-
-        return await page.evaluate((sourcePage) => {
-          const elements = document.querySelectorAll('.event__match');
-          const results = [];
-          elements.forEach(el => {
-            const homeParticipant = el.querySelector('.event__homeParticipant');
-            const homeName = homeParticipant ? (homeParticipant.querySelector('[class*="name"]') || homeParticipant.querySelector('span') || homeParticipant).innerText : '';
-            const awayParticipant = el.querySelector('.event__awayParticipant');
-            const awayName = awayParticipant ? (awayParticipant.querySelector('[class*="name"]') || awayParticipant.querySelector('span') || awayParticipant).innerText : '';
-            const homeScoreText = el.querySelector('.event__score--home')?.innerText || '';
-            const awayScoreText = el.querySelector('.event__score--away')?.innerText || '';
-            const stage = el.querySelector('.event__stage--block')?.innerText || el.querySelector('.event__time')?.innerText || '';
-            
-            const linkEl = el.querySelector('.eventRowLink');
-            const href = linkEl ? linkEl.href : '';
-            
-            const homeSup = el.querySelector('.event__score--home sup')?.innerText || '';
-            const awaySup = el.querySelector('.event__score--away sup')?.innerText || '';
-            
-            results.push({
-              homeName: homeName.trim(),
-              awayName: awayName.trim(),
-              homeScoreText: homeScoreText.trim(),
-              awayScoreText: awayScoreText.trim(),
-              homeSup: homeSup.trim(),
-              awaySup: awaySup.trim(),
-              stage: stage.trim(),
-              href,
-              sourcePage
-            });
-          });
-          return results;
-        }, sourcePage);
-      };
-
-      console.log('🌐 [Scraper] Scraping results...');
-      const resultsMatches = await scrapeUrl('https://www.flashscore.vn/bong-da/world/world-cup/ket-qua/', 'results');
-      console.log(`🌐 [Scraper] Found ${resultsMatches.length} matches in results.`);
-
-      console.log('🌐 [Scraper] Scraping fixtures...');
-      const fixturesMatches = await scrapeUrl('https://www.flashscore.vn/bong-da/world/world-cup/lich-thi-dau/', 'fixtures');
-      console.log(`🌐 [Scraper] Found ${fixturesMatches.length} matches in fixtures.`);
-
-      const matches = [...resultsMatches, ...fixturesMatches];
-      
-      const uniqueMatchesMap = new Map();
-      for (const m of matches) {
-        const key = `${m.homeName}-${m.awayName}`;
-        uniqueMatchesMap.set(key, m);
-      }
-      const uniqueMatches = Array.from(uniqueMatchesMap.values());
-      console.log(`🌐 [Scraper] Total unique matches after combining results and fixtures: ${uniqueMatches.length}`);
-
-      const parsedMatches = [];
-      for (const m of uniqueMatches) {
-        let homeScore = m.homeScoreText;
-        let awayScore = m.awayScoreText;
-        if (m.homeSup) homeScore = homeScore.replace(m.homeSup, '').trim();
-        if (m.awaySup) awayScore = awayScore.replace(m.awaySup, '').trim();
-        
-        let penHomeGoals = '';
-        let penAwayGoals = '';
-        if (m.homeSup) {
-          penHomeGoals = m.homeSup.replace(/[()]/g, '');
-        }
-        if (m.awaySup) {
-          penAwayGoals = m.awaySup.replace(/[()]/g, '');
-        }
-
-        const isLive = m.stage.includes('\'') || m.stage === 'HT' || m.stage === 'Hiệp phụ' || m.stage === 'Luân lưu' || m.stage.includes('Break') || m.stage.includes('ET');
-        const isCompleted = !isLive && (m.stage === 'Kết thúc' || m.stage.includes('KT') || m.stage.includes('Pen') || m.stage.includes('HP') || m.sourcePage === 'results');
-        
-        let status = 'scheduled';
-        if (isCompleted) status = 'completed';
-        else if (isLive) status = 'live';
-
-        let homeTeamGoals = homeScore !== '' && homeScore !== '-' ? parseInt(homeScore, 10) : '';
-        let awayTeamGoals = awayScore !== '' && awayScore !== '-' ? parseInt(awayScore, 10) : '';
-
-        let elapsedMinutes = '';
-        if (isLive) {
-          elapsedMinutes = m.stage;
-        }
-
-        let homeGoals90 = '';
-        let awayGoals90 = '';
-        let extraHomeGoals = '';
-        let extraAwayGoals = '';
-
-        if (status === 'completed' && homeTeamGoals !== '' && awayTeamGoals !== '') {
-          homeGoals90 = homeTeamGoals;
-          awayGoals90 = awayTeamGoals;
-          
-          const goesToET = m.stage.toUpperCase().includes('HP') || m.stage.toUpperCase().includes('PEN') || penHomeGoals !== '';
-          if (goesToET) {
-            extraHomeGoals = homeTeamGoals;
-            extraAwayGoals = awayTeamGoals;
-            
-            if (penHomeGoals !== '' && penAwayGoals !== '') {
-              const pHome = parseInt(penHomeGoals, 10);
-              const pAway = parseInt(penAwayGoals, 10);
-              if (pHome > pAway) {
-                homeTeamGoals = homeTeamGoals + 1;
-              } else {
-                awayTeamGoals = awayTeamGoals + 1;
-              }
-            }
-
-            const isRelevant = dbMatches.length === 0 || dbMatches.some(dbMatch => 
-              this.matchTeamName(dbMatch.homeTeamName, m.homeName) && 
-              this.matchTeamName(dbMatch.awayTeamName, m.awayName)
-            );
-
-            if (isRelevant && m.href) {
-              try {
-                console.log(`🌐 [Scraper] Fetching sub-scores for ET match: ${m.homeName} vs ${m.awayName}...`);
-                const detailPage = await browser.newPage();
-                await detailPage.goto(m.href, { waitUntil: 'networkidle2', timeout: 30000 });
-                await new Promise(r => setTimeout(r, 2000));
-                
-                const cells = await detailPage.evaluate(() => {
-                  const elList = document.querySelectorAll('[class*="period"], [class*="cell"]');
-                  return Array.from(elList).map(el => el.innerText.trim());
-                });
-                
-                let h1Score = '';
-                let h2Score = '';
-                for (let i = 0; i < cells.length; i++) {
-                  const txt = cells[i].toUpperCase();
-                  if (txt === 'HIỆP 1' || txt === '1ST HALF') {
-                    h1Score = cells[i+1] || '';
-                  } else if (txt === 'HIỆP 2' || txt === '2ND HALF') {
-                    h2Score = cells[i+1] || '';
-                  }
-                }
-                
-                if (h1Score && h2Score) {
-                  const [h1Home, h1Away] = h1Score.split('-').map(Number);
-                  const [h2Home, h2Away] = h2Score.split('-').map(Number);
-                  if (!isNaN(h1Home) && !isNaN(h2Home)) {
-                    homeGoals90 = h1Home + h2Home;
-                    awayGoals90 = h1Away + h2Away;
-                    console.log(`🌐 [Scraper] Parsed 90-min score for ${m.homeName}: ${homeGoals90}-${awayGoals90}`);
-                  }
-                }
-                await detailPage.close();
-              } catch (detailErr) {
-                console.warn(`⚠️ [Scraper] Failed to fetch match details for ET: ${detailErr.message}`);
-              }
-            }
-          }
-        }
-
-        parsedMatches.push({
-          homeName: m.homeName,
-          awayName: m.awayName,
-          homeTeamGoals,
-          awayTeamGoals,
-          elapsedMinutes,
-          status,
-          homeGoals90,
-          awayGoals90,
-          extraHomeGoals,
-          extraAwayGoals,
-          penHomeGoals: penHomeGoals ? parseInt(penHomeGoals, 10) : '',
-          penAwayGoals: penAwayGoals ? parseInt(penAwayGoals, 10) : ''
-        });
-      }
-
-      await browser.close();
-      return parsedMatches;
-    } catch (err) {
-      console.error('❌ [Scraper] Error scraping Flashscore:', err);
-      try {
-        await browser.close();
-      } catch {}
-      return [];
-    }
   }
 }
 
