@@ -121,6 +121,41 @@ class WcBetServer {
       }
     });
 
+    this.app.get('/api/debug', (req, res) => {
+      try {
+        const fs = require('fs');
+        const dataExists = fs.existsSync(this.matchesFile);
+        const templateExists = fs.existsSync(path.join(__dirname, 'initial-data', 'matches.xlsx'));
+        
+        let fileMatches = [];
+        if (dataExists) {
+          fileMatches = this.excelService.readSheet(this.matchesFile, 'matches') || [];
+        }
+        
+        res.json({
+          env: {
+            PORT: process.env.PORT,
+            DATA_DIR: process.env.DATA_DIR,
+            NODE_ENV: process.env.NODE_ENV,
+          },
+          paths: {
+            __dirname,
+            dataDir: this.dataDir,
+            matchesFile: this.matchesFile,
+            dataExists,
+            templateExists,
+          },
+          syncStatus: this.matchService.lastSyncStatus,
+          matchesCount: fileMatches.length,
+          completedMatches: fileMatches
+            .filter(m => m.status === 'completed' || (m.homeTeamGoals !== null && m.homeTeamGoals !== '' && m.homeTeamGoals !== '-') || (m.awayTeamGoals !== null && m.awayTeamGoals !== '' && m.awayTeamGoals !== '-'))
+            .map(m => ({ id: m.id, home: m.homeTeamName, away: m.awayTeamName, score: `${m.homeTeamGoals}-${m.awayTeamGoals}`, status: m.status })),
+        });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
     this.app.put('/api/matches/:id/status', (req, res, next) => {
       try {
         const updatedMatch = this.matchService.updateMatchStatus(req.params.id, req.body);
