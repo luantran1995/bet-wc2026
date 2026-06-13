@@ -109,7 +109,6 @@ class MatchService extends EventEmitter {
     const existingMatches = JSON.parse(JSON.stringify(processedMatches));
     const now = new Date();
 
-    // 1. Scrape real-time results from Flashscore.vn
     // 1. Scrape real-time results from Flashscore.vn using Scraper Factory & Strategy Pattern
     let scrapedMatches = [];
     try {
@@ -161,6 +160,10 @@ class MatchService extends EventEmitter {
     }
 
     processedMatches.forEach(match => {
+      const oldMatch = existingMatches.find(o => parseInt(o.id, 10) === parseInt(match.id, 10));
+      const oldStatus = oldMatch ? oldMatch.status : 'scheduled';
+      const matchId = parseInt(match.id, 10);
+
       // Find if this match is available in the scraped Flashscore list
       const scraped = scrapedMatches.find(s => 
         this.matchTeamName(match.homeTeamName, s.homeName) && 
@@ -179,33 +182,89 @@ class MatchService extends EventEmitter {
         match.extraAwayGoals = scraped.extraAwayGoals;
         match.penHomeGoals = scraped.penHomeGoals;
         match.penAwayGoals = scraped.penAwayGoals;
+      } else if (knownScores[matchId]) {
+        const ks = knownScores[matchId];
+        match.status = ks.status;
+        match.homeTeamGoals = ks.homeTeamGoals;
+        match.awayTeamGoals = ks.awayTeamGoals;
+        match.elapsedMinutes = ks.elapsedMinutes;
+        match.homeGoals90 = ks.homeGoals90;
+        match.awayGoals90 = ks.awayGoals90;
+        match.extraHomeGoals = ks.extraHomeGoals;
+        match.extraAwayGoals = ks.extraAwayGoals;
+        match.penHomeGoals = ks.penHomeGoals;
+        match.penAwayGoals = ks.penAwayGoals;
       } else {
-        const matchId = parseInt(match.id, 10);
-        if (knownScores[matchId]) {
-          const ks = knownScores[matchId];
-          match.status = ks.status;
-          match.homeTeamGoals = ks.homeTeamGoals;
-          match.awayTeamGoals = ks.awayTeamGoals;
-          match.elapsedMinutes = ks.elapsedMinutes;
-          match.homeGoals90 = ks.homeGoals90;
-          match.awayGoals90 = ks.awayGoals90;
-          match.extraHomeGoals = ks.extraHomeGoals;
-          match.extraAwayGoals = ks.extraAwayGoals;
-          match.penHomeGoals = ks.penHomeGoals;
-          match.penAwayGoals = ks.penAwayGoals;
-        } else if (match.status === 'scheduled') {
+        // Fallback to simulation logic
+        if (oldStatus === 'completed') {
+          // Rule 1: Once completed, keep the database values intact to preserve manual overrides or completed states
+          if (oldMatch) {
+            match.status = oldMatch.status;
+            match.homeTeamGoals = oldMatch.homeTeamGoals;
+            match.awayTeamGoals = oldMatch.awayTeamGoals;
+            match.elapsedMinutes = oldMatch.elapsedMinutes;
+            match.homeGoals90 = oldMatch.homeGoals90;
+            match.awayGoals90 = oldMatch.awayGoals90;
+            match.extraHomeGoals = oldMatch.extraHomeGoals;
+            match.extraAwayGoals = oldMatch.extraAwayGoals;
+            match.penHomeGoals = oldMatch.penHomeGoals;
+            match.penAwayGoals = oldMatch.penAwayGoals;
+          }
+        } else {
           const sim = this.calculateSimulatedMatchState(match, now);
-          if (sim.status !== 'scheduled') {
-            match.status = sim.status;
-            match.homeTeamGoals = sim.homeTeamGoals;
-            match.awayTeamGoals = sim.awayTeamGoals;
-            match.elapsedMinutes = sim.elapsedMinutes;
-            match.homeGoals90 = sim.homeGoals90;
-            match.awayGoals90 = sim.awayGoals90;
-            match.extraHomeGoals = sim.extraHomeGoals;
-            match.extraAwayGoals = sim.extraAwayGoals;
-            match.penHomeGoals = sim.penHomeGoals;
-            match.penAwayGoals = sim.penAwayGoals;
+          
+          if (oldStatus === 'live') {
+            if (sim.status === 'completed') {
+              match.status = 'completed';
+              // Keep database score if it exists, otherwise use simulated score
+              const hasDbScore = oldMatch && oldMatch.homeTeamGoals !== null && oldMatch.homeTeamGoals !== '';
+              match.homeTeamGoals = hasDbScore ? oldMatch.homeTeamGoals : sim.homeTeamGoals;
+              match.awayTeamGoals = hasDbScore ? oldMatch.awayTeamGoals : sim.awayTeamGoals;
+              match.elapsedMinutes = '';
+              
+              const finalHome = match.homeTeamGoals;
+              const finalAway = match.awayTeamGoals;
+              match.homeGoals90 = (oldMatch && oldMatch.homeGoals90 !== undefined && oldMatch.homeGoals90 !== '') ? oldMatch.homeGoals90 : finalHome;
+              match.awayGoals90 = (oldMatch && oldMatch.awayGoals90 !== undefined && oldMatch.awayGoals90 !== '') ? oldMatch.awayGoals90 : finalAway;
+              
+              match.extraHomeGoals = (oldMatch && oldMatch.extraHomeGoals !== undefined && oldMatch.extraHomeGoals !== '') ? oldMatch.extraHomeGoals : '';
+              match.extraAwayGoals = (oldMatch && oldMatch.extraAwayGoals !== undefined && oldMatch.extraAwayGoals !== '') ? oldMatch.extraAwayGoals : '';
+              match.penHomeGoals = (oldMatch && oldMatch.penHomeGoals !== undefined && oldMatch.penHomeGoals !== '') ? oldMatch.penHomeGoals : '';
+              match.penAwayGoals = (oldMatch && oldMatch.penAwayGoals !== undefined && oldMatch.penAwayGoals !== '') ? oldMatch.penAwayGoals : '';
+            } else if (sim.status === 'live') {
+              match.status = 'live';
+              const hasDbScore = oldMatch && oldMatch.homeTeamGoals !== null && oldMatch.homeTeamGoals !== '';
+              match.homeTeamGoals = hasDbScore ? oldMatch.homeTeamGoals : sim.homeTeamGoals;
+              match.awayTeamGoals = hasDbScore ? oldMatch.awayTeamGoals : sim.awayTeamGoals;
+              match.elapsedMinutes = sim.elapsedMinutes; // Progress the clock
+            } else {
+              // Clock issue, preserve current live state
+              if (oldMatch) {
+                match.status = oldMatch.status;
+                match.homeTeamGoals = oldMatch.homeTeamGoals;
+                match.awayTeamGoals = oldMatch.awayTeamGoals;
+                match.elapsedMinutes = oldMatch.elapsedMinutes;
+              }
+            }
+          } else {
+            // Match is scheduled in database
+            if (sim.status !== 'scheduled') {
+              match.status = sim.status;
+              match.homeTeamGoals = sim.homeTeamGoals;
+              match.awayTeamGoals = sim.awayTeamGoals;
+              match.elapsedMinutes = sim.elapsedMinutes;
+              match.homeGoals90 = sim.homeGoals90;
+              match.awayGoals90 = sim.awayGoals90;
+              match.extraHomeGoals = sim.extraHomeGoals;
+              match.extraAwayGoals = sim.extraAwayGoals;
+              match.penHomeGoals = sim.penHomeGoals;
+              match.penAwayGoals = sim.penAwayGoals;
+            } else {
+              match.status = 'scheduled';
+              match.homeTeamGoals = '';
+              match.awayTeamGoals = '';
+              match.elapsedMinutes = '';
+            }
           }
         }
       }
@@ -216,45 +275,12 @@ class MatchService extends EventEmitter {
       return a.id - b.id;
     });
 
-    // Merge logic: preserve manual overrides or settle bets on completion transitions
+    // Merge logic / settle bets on completion transitions
     processedMatches.forEach(newMatch => {
       const oldMatch = existingMatches.find(o => parseInt(o.id, 10) === newMatch.id);
-      
-      if (oldMatch) {
-        const hasLocalData = oldMatch.status !== 'scheduled' || 
-                             (oldMatch.homeTeamGoals !== null && oldMatch.homeTeamGoals !== '') ||
-                             (oldMatch.awayTeamGoals !== null && oldMatch.awayTeamGoals !== '');
-
-        if (hasLocalData) {
-          const sim = this.calculateSimulatedMatchState(newMatch, now);
-          const isManualOverride = oldMatch.status !== sim.status ||
-                                   (oldMatch.homeTeamGoals !== null && oldMatch.homeTeamGoals !== '' && Number(oldMatch.homeTeamGoals) !== sim.homeTeamGoals) ||
-                                   (oldMatch.awayTeamGoals !== null && oldMatch.awayTeamGoals !== '' && Number(oldMatch.awayTeamGoals) !== sim.awayTeamGoals);
-
-          if (isManualOverride) {
-            newMatch.status = oldMatch.status;
-            newMatch.homeTeamGoals = oldMatch.homeTeamGoals;
-            newMatch.awayTeamGoals = oldMatch.awayTeamGoals;
-            newMatch.elapsedMinutes = oldMatch.elapsedMinutes;
-            
-            const isCompleted = oldMatch.status === 'completed';
-            newMatch.homeGoals90 = (oldMatch.homeGoals90 !== undefined && oldMatch.homeGoals90 !== '') 
-              ? oldMatch.homeGoals90 
-              : (isCompleted ? oldMatch.homeTeamGoals : '');
-            newMatch.awayGoals90 = (oldMatch.awayGoals90 !== undefined && oldMatch.awayGoals90 !== '') 
-              ? oldMatch.awayGoals90 
-              : (isCompleted ? oldMatch.awayTeamGoals : '');
-              
-            newMatch.extraHomeGoals = (oldMatch.extraHomeGoals !== undefined && oldMatch.extraHomeGoals !== '') ? oldMatch.extraHomeGoals : '';
-            newMatch.extraAwayGoals = (oldMatch.extraAwayGoals !== undefined && oldMatch.extraAwayGoals !== '') ? oldMatch.extraAwayGoals : '';
-            newMatch.penHomeGoals = (oldMatch.penHomeGoals !== undefined && oldMatch.penHomeGoals !== '') ? oldMatch.penHomeGoals : '';
-            newMatch.penAwayGoals = (oldMatch.penAwayGoals !== undefined && oldMatch.penAwayGoals !== '') ? oldMatch.penAwayGoals : '';
-          }
-        }
-      }
-
-      // Auto settle bets if status was transitioned to completed (Observer Pattern)
       const oldStatus = oldMatch ? oldMatch.status : 'scheduled';
+      
+      // Auto settle bets if status was transitioned to completed (Observer Pattern)
       if (newMatch.status === 'completed' && oldStatus !== 'completed') {
         console.log(`🏆 Match ${newMatch.id} completed: ${newMatch.homeTeamName} ${newMatch.homeTeamGoals}-${newMatch.awayTeamGoals} ${newMatch.awayTeamName}`);
         this.emit('matchCompleted', newMatch);

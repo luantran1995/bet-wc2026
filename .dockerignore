@@ -1,0 +1,8 @@
+node_modules
+.git
+.angular
+frontend/node_modules
+backend-excel/node_modules
+frontend/dist
+backend-excel/data
+backend-excel/data_temp
