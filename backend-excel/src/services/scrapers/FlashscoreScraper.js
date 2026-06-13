@@ -82,6 +82,15 @@ class FlashscoreScraper extends ScraperStrategy {
     try {
       const page = await browser.newPage();
       
+      // Override User-Agent, Viewport and Webdriver properties to bypass Cloudflare bot detection
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+      await page.setViewport({ width: 1366, height: 768 });
+      await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, 'webdriver', {
+          get: () => false,
+        });
+      });
+      
       // Enable Request Interception to block third-party trackers, ads, images, fonts, and media
       await page.setRequestInterception(true);
       page.on('request', (request) => {
@@ -249,6 +258,15 @@ class FlashscoreScraper extends ScraperStrategy {
               try {
                 console.log(`🌐 [Scraper] Fetching sub-scores for ET match: ${m.homeName} vs ${m.awayName}...`);
                 const detailPage = await browser.newPage();
+                
+                // Override User-Agent, Viewport and Webdriver properties to bypass Cloudflare bot detection
+                await detailPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+                await detailPage.setViewport({ width: 1366, height: 768 });
+                await detailPage.evaluateOnNewDocument(() => {
+                  Object.defineProperty(navigator, 'webdriver', {
+                    get: () => false,
+                  });
+                });
                 
                 // Enable request interception for detail page too
                 await detailPage.setRequestInterception(true);
