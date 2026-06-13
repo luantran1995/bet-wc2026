@@ -46,6 +46,12 @@ class WcBetServer {
   configureMiddleware() {
     this.app.use(cors());
     this.app.use(express.json());
+    this.app.use('/api', (req, res, next) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      next();
+    });
   }
 
   /**
