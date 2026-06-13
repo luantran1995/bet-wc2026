@@ -75,7 +75,7 @@ class MatchService extends EventEmitter {
    * Synchronizes match data from Sportmonks API (default) or FIFA GitHub fallbacks.
    * Automatically schedules bet auto-settlement for newly completed matches.
    */
-  async syncMatchesFromApi() {
+  async syncMatchesFromApi(bypassActiveCheck = false) {
     console.log('🔄 Syncing match data exclusively from Flashscore VN...');
     let processedMatches = [];
     
@@ -109,21 +109,42 @@ class MatchService extends EventEmitter {
     const existingMatches = JSON.parse(JSON.stringify(processedMatches));
     const now = new Date();
 
+    // Check if we should scrape based on active matches window (-5 minutes to +240 minutes)
+    let shouldScrape = true;
+    if (!bypassActiveCheck) {
+      const activeMatches = processedMatches.filter(match => {
+        if (match.status === 'completed') return false;
+        const matchTime = this.parseVnTimeToDate(match.time);
+        if (!matchTime) return false;
+        const diffMin = (now.getTime() - matchTime.getTime()) / (60 * 1000);
+        return diffMin >= -5 && diffMin <= 240;
+      });
+      shouldScrape = activeMatches.length > 0;
+      if (!shouldScrape) {
+        console.log('📭 No active matches scheduled/playing within the current time window (-5m to +240m). Skipping Flashscore scraper.');
+        this.lastSyncStatus = { success: true, timestamp: new Date().toISOString(), message: 'Scraping skipped (no active matches)' };
+      } else {
+        console.log(`🔥 Found ${activeMatches.length} active match(es) in window. Proceeding with Flashscore scraper.`);
+      }
+    }
+
     // 1. Scrape real-time results from Flashscore.vn using Scraper Factory & Strategy Pattern
     let scrapedMatches = [];
-    try {
-      const ScraperFactory = require('./scrapers/ScraperFactory');
-      const scraper = ScraperFactory.createScraper('flashscore');
-      scrapedMatches = await scraper.scrape(processedMatches, this.matchTeamName.bind(this));
-      console.log(`✅ Scraped ${scrapedMatches.length} matches from Flashscore VN.`);
-      this.lastSyncStatus = { success: true, timestamp: new Date().toISOString() };
-    } catch (scrapeErr) {
-      console.warn(`⚠️ Flashscore scraper failed: ${scrapeErr.message}. Falling back to simulation...`);
-      this.lastSyncStatus = {
-        success: false,
-        error: scrapeErr.message,
-        timestamp: new Date().toISOString()
-      };
+    if (shouldScrape) {
+      try {
+        const ScraperFactory = require('./scrapers/ScraperFactory');
+        const scraper = ScraperFactory.createScraper('flashscore');
+        scrapedMatches = await scraper.scrape(processedMatches, this.matchTeamName.bind(this));
+        console.log(`✅ Scraped ${scrapedMatches.length} matches from Flashscore VN.`);
+        this.lastSyncStatus = { success: true, timestamp: new Date().toISOString() };
+      } catch (scrapeErr) {
+        console.warn(`⚠️ Flashscore scraper failed: ${scrapeErr.message}. Falling back to simulation...`);
+        this.lastSyncStatus = {
+          success: false,
+          error: scrapeErr.message,
+          timestamp: new Date().toISOString()
+        };
+      }
     }
 
     // 2. Known/Correct results to override or correct API lag (as secondary fallback)

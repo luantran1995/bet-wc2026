@@ -112,7 +112,7 @@ class WcBetServer {
     this.app.post('/api/matches/sync', async (req, res, next) => {
       try {
         console.log('🔄 Manual matches sync triggered via API endpoint...');
-        await this.matchService.syncMatchesFromApi();
+        await this.matchService.syncMatchesFromApi(true);
         const matches = this.matchService.getMatches();
         const status = this.matchService.lastSyncStatus || { success: true };
         res.json({ message: 'Sync complete', matches, syncStatus: status });
@@ -293,7 +293,7 @@ class WcBetServer {
     (async () => {
       try {
         console.log('🌐 Syncing WC 2026 matches from Flashscore VN on startup...');
-        await this.matchService.syncMatchesFromApi();
+        await this.matchService.syncMatchesFromApi(true);
       } catch (err) {
         console.warn('⚠️ Startup sync failed (using local cache if available):', err.message);
       }
@@ -304,7 +304,7 @@ class WcBetServer {
     setInterval(async () => {
       try {
         console.log('🔄 Auto-syncing matches from Flashscore VN (real-time schedule)...');
-        await this.matchService.syncMatchesFromApi();
+        await this.matchService.syncMatchesFromApi(false);
       } catch (err) {
         console.error('❌ Auto-sync failed:', err.message);
       }
